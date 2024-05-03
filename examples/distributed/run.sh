@@ -2,7 +2,7 @@
 echo 'Run training on MoE-BERT...'
 python main.py \
     --model_name 'bert' \
-    --train_batch_size 1 \
+    --train_batch_size 350\
     --eval_batch_size 1 \
     --num_epochs 1 \
     --cuda \

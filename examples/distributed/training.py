@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from pty import slave_open
 import time
 import pickle
 import numpy as np
@@ -30,6 +31,9 @@ from fmoe.distributed import DistributedGroupedDataParallel as DDP
 
 os.environ['TRANSFORMERS_NO_ADVISORY_WARNINGS'] = 'true'
 
+
+
+
 # train bert
 def train_Bert_MoE(**kwargs):
     device = kwargs['device']
@@ -47,7 +51,7 @@ def train_Bert_MoE(**kwargs):
     global_rank = kwargs['global_rank']
     moe_sync_group = kwargs['moe_sync_group']
     dist = kwargs['dist']
-    
+
     # def rename_files_in_directory(directory, old_suffix, new_suffix):
     # # 遍歷指定目錄中的所有文件
     # for filename in os.listdir(directory):
@@ -253,7 +257,6 @@ def train_Bert_MoE(**kwargs):
 
     optimizer = torch.optim.Adam(model.parameters(),
                                 lr=3e-5)
-    # ,
                                 # betas=(0.9,0.999),
                                 # eps=1e-08)
     # num_epochs = 8
@@ -270,6 +273,10 @@ def train_Bert_MoE(**kwargs):
     if dist:
         model = DDP(model, device_ids=[local_rank], moe_sync_group = moe_sync_group)
         model._sync_params()
+
+    # 在訓練之前，獲取模型每一層的初始權重
+    initial_weights = {name: p.data.clone() for name, p in model.named_parameters()}
+    
     try:
         for epoch in range(num_epochs):
             model.train()
@@ -281,6 +288,17 @@ def train_Bert_MoE(**kwargs):
             throttling_costs = 0
             comm_costs = 0
             losses = []
+            gate_grads_0 = []
+            layer_grads_all = []
+            expert_grads_0 = []
+            expert_grads_1 = [] 
+            expert_grads_2 = [] 
+            expert_grads_3 = [] 
+            expert_grads_4 = [] 
+            expert_grads_5 = [] 
+            expert_grads_6 = [] 
+            expert_grads_7 = []  
+
             for batch in train_dataloader:
                 # break
                 batch = {k: v.to(device) for k, v in batch.items()}
@@ -288,55 +306,78 @@ def train_Bert_MoE(**kwargs):
                 outputs = model(**batch, training_step = step)
                 loss = outputs.loss
                 loss.backward()
-                layer_grads = [] 
 
+
+                #Single Expert gradient output
                 for name, para in model.named_parameters():
-                    if "bert.encoder.layer.0.moe_linear.experts.0.htoh4.weight" in name:
-                                this_grads = para.grad.view(-1)
-                                size = this_grads.size(0)
-                                sum_gradients = this_grads[0].item()
-                                # print(sum_gradients)
-                                mean_gradients = sum_gradients / size
-                                # print(mean_gradients)
-                                layer_grads.append(mean_gradients)
-                
-                    # for j in range(8):
-                    #     if "bert.encoder.layer.0.moe_linear.experts." + str(j) + ".htoh4.weight" in name:
-                    #         parts = name.split(".")
-                    #         expert_id = int(parts[6])
-                    #         if para.requires_grad and para.grad is not None:
-                    #             # print(para.grad.view(-1))
-                    #             layer_grads[expert_id].extend(para.grad.view(-1).tolist())
+                    for i in range(8):
+                        expert_grads = f"expert_grads_{i}"
+                        if "bert.encoder.layer.0.moe_linear.experts." + str(i) + ".htoh4.weight" in name:
+                            # slope = para.grad
+                            # print(slope)
+                            this_grads = para.grad.view(-1).cpu()
+                            # print(this_grads)
+                            expert_mean_gradients = this_grads.abs().mean()
+                            # expert_mean_gradients = this_grads.detach().abs().mean()
+                            print(f"expert_grads_{i} : ", expert_mean_gradients)
+                            eval(expert_grads).append(expert_mean_gradients)
 
-                # print("layer0_grad: ", layer0_grads[0])
-                # print("layer0_grad_size: ", layer0_grads[0].size())
-
-                # 输出每个专家的梯度
-                # for expert_id, grads in enumerate(layer_grads):
-                #     print(f"Expert {expert_id} gradients: {grads}")
-                    
-                # 绘制损失图
-                # for expert_id, grads in enumerate(layer_grads):
-                #     plt.imshow(grads, cmap='viridis', interpolation='nearest', label=f"Expert {expert_id}")
-                #     plt.colorbar()
-                #     plt.title('Gradient Matrix')
-                #     plt.savefig(f'gate_count_Layer0_expert_{expert_id}.png', bbox_inches='tight')
-                #     plt.close()
-
-                # plt.xlabel("Iteration")
-                # plt.ylabel("Gradient Value")
-                # plt.title("Gradient Flow for Each Expert")
-                # plt.legend()
-                # # plt.savefig(f'gate_count_Layer0_expert_{expert_id}.png', bbox_inches='tight')
-                # plt.show()
-                # print("Layer 1",  mymoeParam['bert.encoder.layer.'+str(layer)+'.moe_linear.experts.'+str(expert_id)+'.htoh4.weight'] = bertParam['bert.encoder.layer.'+str(layer)+'.intermediate.dense.weight'])
-                # if 'conv1' in name:
-                #     layer_grads.append(_parameters[name].grad)
-                #     print("conv1_Loss:",_parameters[name].grad)
                 loss_all += loss.item()
                 losses.append(loss.item())
                 optimizer.step()
                 lr_scheduler.step()
+
+                # # 計算每個epoch後權重的變化
+                # weight_changes = {name: (p.data - initial_weights[name]).abs().sum().item() for name, p in model.named_parameters()}
+
+                # # 儲存或打印權重變化數據
+                # print(f'Epoch {epoch}:')
+                # for name, change in weight_changes.items():
+                #     print(f' - {name} weight change: {change}')
+
+
+
+                        # if "bert.encoder.layer.0.moe_linear.gate.gate.weight" in name:
+                        #     current_gate = para.grad.view(-1).cpu()
+                        #     print(f"layer_0_gate_weight: ", para)
+                        #     print(f"Layer_0_gate_for_exp_{i}: ", current_gate)
+                        #     current_gate_grads_exp_i = current_gate[i]
+                        #     print("current_gate_grads_exp_i: ", current_gate_grads_exp_i)
+                        #     gate_mean_gradients = current_gate_grads_exp_i.detach().abs().mean()
+                        #     print(f"gate_grads_for_exp_{i} : ", gate_mean_gradients)
+                        #     eval(gate_grads).append(gate_mean_gradients)
+
+                    # if "bert.encoder.layer.0.moe_linear.gate.gate.weight" in name:
+                    #     # print(para.shape)
+                    #     current_gate = para.grad.view(-1).cpu()
+                    #     # print(f"layer_0_gate_weight: ", para)
+                    #     # print(f"Layer_0_gate_for_exp_{i}: ", current_gate)
+                    #     # print("current_gate_grads_exp_i: ", current_gate_grads_exp_i)
+                    #     gate_mean_gradients = current_gate.detach().abs().mean()
+                    #     # print(gate_mean_gradients)
+                    #     gate_grads_0.append(gate_mean_gradients)
+
+                    # if "bert.encoder.layer.0.moe_linear.layer_norm.weight" in name:
+                    #     layer_grads = para.grad.view(-1).cpu()
+                    #     # print("Layer: ", para)
+                    #     layer_mean_gradients = layer_grads.detach().abs().mean()
+                    #     # print(f"Layer_grads : ", layer_mean_gradients)
+                    #     layer_grads_all.append(layer_mean_gradients)
+                # print("file_size: ", len(layer_grads_0))
+                        
+
+
+
+
+                    # 读取最终权重
+                    # final_weight = final_gate_weights[i]
+                    
+                #     # 计算当前权重和最终权重的L2范数差异
+                #     current_diff = torch.norm(current_weight - final_weight).item()
+                #     # 归一化这个差异
+                #     normalized_diff = abs(current_diff) / abs(initial_final_diff[i])
+                #     normalized_diffs[i].append(normalized_diff)  # 将归一化差异添加到对应层的列表中
+
                 optimizer.zero_grad()
                 elapsed_all += time.time() - batch_start
                 step += 1
@@ -356,24 +397,19 @@ def train_Bert_MoE(**kwargs):
                 # old_suffix = 'gate_count_layer_*.txt'
                 # new_suffix = 'gate_count_layer_*.txt'
                 # rename_files_in_directory(directory_path, old_suffix, new_suffix)
-            for layer_grads in enumerate(layer_grads):
-                x_values = range(len(layer_grads))
-                plt.plot(x_values, layer_grads, marker='o')
 
-            # 添加标题和标签
-            plt.title('Histogram of Mean Gradients')
-            plt.xlabel('Batech Step')
-            plt.ylabel('Mean Gradient Value')
+            # with open(f"layer_grads_all.txt", 'a') as file:
+            #         for item in layer_grads_all:
+            #             file.write(str(item) + '\n')
 
-            # 保存图形为 PNG 文件
-            plt.savefig('histogram.png')
-            # 显示图形（可选）
-            plt.show()        
-            # 打开一个txt文件以写入模式
-            with open('output.txt', 'w') as file:
-                # 遍历数组的每个元素，将其写入文件
-                for item in layer_grads:
-                    file.write(str(item) + '\n')
+            for i in range(8):
+                with open(f"expert_grads_{i}.txt", 'a') as file:
+                    for item in eval(f"expert_grads_{i}"):
+                        file.write(str(item) + '\n')
+
+            # with open("gate_grads_0.txt", 'a') as file:
+            #     for item in gate_grads_0:
+            #         file.write(str(item) + '\n')
             # dict_router = {}
             # index = 0
                 # if step % eval_interval == 0:
