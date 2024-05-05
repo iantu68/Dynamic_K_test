@@ -1,6 +1,6 @@
 #!/bin/bash
 echo 'Plot Expert Mean Gradients Value...'
-python expert_grads_plot.py
+python plot_expert_grads.py
 echo 'Done!'
 echo '=============================='
 # echo 'Plot Gate Gradients Value...'
