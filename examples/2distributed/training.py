@@ -343,40 +343,6 @@ def train_Bert_MoE(**kwargs):
             expert_grads_5_L2_mean_first_abs = [] 
             expert_grads_6_L2_mean_first_abs = [] 
             expert_grads_7_L2_mean_first_abs = []  
-
-            expert_grads_0_L1_sub_first_nabs = []
-            expert_grads_1_L1_sub_first_nabs = [] 
-            expert_grads_2_L1_sub_first_nabs = [] 
-            expert_grads_3_L1_sub_first_nabs = [] 
-            expert_grads_4_L1_sub_first_nabs = [] 
-            expert_grads_5_L1_sub_first_nabs = [] 
-            expert_grads_6_L1_sub_first_nabs = [] 
-            expert_grads_7_L1_sub_first_nabs = []    
-            expert_grads_0_L2_sub_first_nabs = []
-            expert_grads_1_L2_sub_first_nabs = [] 
-            expert_grads_2_L2_sub_first_nabs = [] 
-            expert_grads_3_L2_sub_first_nabs = [] 
-            expert_grads_4_L2_sub_first_nabs = [] 
-            expert_grads_5_L2_sub_first_nabs = [] 
-            expert_grads_6_L2_sub_first_nabs = [] 
-            expert_grads_7_L2_sub_first_nabs = []
-            
-            expert_grads_0_L1_sub_first_abs = [] 
-            expert_grads_1_L1_sub_first_abs = [] 
-            expert_grads_2_L1_sub_first_abs = [] 
-            expert_grads_3_L1_sub_first_abs = [] 
-            expert_grads_4_L1_sub_first_abs = [] 
-            expert_grads_5_L1_sub_first_abs = [] 
-            expert_grads_6_L1_sub_first_abs = [] 
-            expert_grads_7_L1_sub_first_abs = []
-            expert_grads_0_L2_sub_first_abs = [] 
-            expert_grads_1_L2_sub_first_abs = [] 
-            expert_grads_2_L2_sub_first_abs = [] 
-            expert_grads_3_L2_sub_first_abs = [] 
-            expert_grads_4_L2_sub_first_abs = [] 
-            expert_grads_5_L2_sub_first_abs = [] 
-            expert_grads_6_L2_sub_first_abs = [] 
-            expert_grads_7_L2_sub_first_abs = []  
             
             loss_all_array = []
             previous_grads1 = 0
@@ -407,19 +373,11 @@ def train_Bert_MoE(**kwargs):
                             previous_grads2 = torch.zeros_like(para.grad.view(-1).cpu())
                             previous_grads3 = torch.zeros_like(para.grad.view(-1).cpu())
                             previous_grads4 = torch.zeros_like(para.grad.view(-1).cpu())
-                            previous_grads5 = torch.zeros_like(para.grad.view(-1).cpu())
-                            previous_grads6 = torch.zeros_like(para.grad.view(-1).cpu())
-                            previous_grads7 = torch.zeros_like(para.grad.view(-1).cpu())
-                            previous_grads8 = torch.zeros_like(para.grad.view(-1).cpu())
                         for i in range(8):
                             expert_grads_L1_mean_first_nabs = f"expert_grads_{i}_L1_mean_first_nabs"
                             expert_grads_L2_mean_first_nabs = f"expert_grads_{i}_L2_mean_first_nabs"
                             expert_grads_L1_mean_first_abs = f"expert_grads_{i}_L1_mean_first_abs"
                             expert_grads_L2_mean_first_abs = f"expert_grads_{i}_L2_mean_first_abs"
-                            expert_grads_L1_sub_first_nabs = f"expert_grads_{i}_L1_sub_first_nabs"
-                            expert_grads_L2_sub_first_nabs = f"expert_grads_{i}_L2_sub_first_nabs"
-                            expert_grads_L1_sub_first_abs = f"expert_grads_{i}_L1_sub_first_abs"
-                            expert_grads_L2_sub_first_abs = f"expert_grads_{i}_L2_sub_first_abs"
 
                             #_mean_first_nabs
                             if "bert.encoder.layer.0.moe_linear.experts." + str(i) + ".htoh4.weight" in name:
@@ -454,41 +412,6 @@ def train_Bert_MoE(**kwargs):
                                     print(f"expert_grads_{i}_L2_mean_first_abs: ", grad_change)
                                     eval(expert_grads_L2_mean_first_abs).append(grad_change)
                                 previous_grads4 = this_grads.clone()
-
-                            #_sub_first_nabs
-                            if "bert.encoder.layer.0.moe_linear.experts." + str(i) + ".htoh4.weight" in name:
-                                if previous_grads5 is not None:
-                                    this_grads = para.grad.view(-1).cpu() 
-                                    grad_change = (this_grads - previous_grads5).detach().mean()
-                                    print(f"expert_grads_{i}_L1_sub_first_nabs: ", grad_change)
-                                    eval(expert_grads_L1_sub_first_nabs).append(grad_change)
-                                previous_grads5 = this_grads.clone()
-                                # print(previous_grads5)
-                            if "bert.encoder.layer.0.moe_linear.experts." + str(i) + ".h4toh.weight" in name:
-                                if previous_grads6 is not None:
-                                    this_grads = para.grad.view(-1).cpu() 
-                                    grad_change = (this_grads - previous_grads6).detach().mean()
-                                    print(f"expert_grads_{i}_L2_sub_first_nabs: ", grad_change)
-                                    eval(expert_grads_L2_sub_first_nabs).append(grad_change)
-                                previous_grads6 = this_grads.clone()
-
-                            #_sub_first_abs
-                            if "bert.encoder.layer.0.moe_linear.experts." + str(i) + ".htoh4.weight" in name:
-                                if previous_grads7 is not None:
-                                    this_grads = para.grad.view(-1).cpu() 
-                                    grad_change = (this_grads - previous_grads7).detach().abs().mean()
-                                    print(f"expert_grads_{i}_L1_sub_first_abs: ", grad_change)
-                                    eval(expert_grads_L1_sub_first_abs).append(grad_change)
-                                previous_grads7 = this_grads.clone()
-                            if "bert.encoder.layer.0.moe_linear.experts." + str(i) + ".h4toh.weight" in name:
-                                if previous_grads8 is not None:
-                                    this_grads = para.grad.view(-1).cpu() 
-                                    grad_change = (this_grads - previous_grads8).detach().abs().mean()
-                                    print(f"expert_grads_{i}_L2_sub_first_abs: ", grad_change)
-                                    eval(expert_grads_L2_sub_first_abs).append(grad_change)
-                                previous_grads8 = this_grads.clone()
-
-
                             
                     # if "bert.encoder.layer.0.moe_linear.gate.gate.weight" in name:
                     #     # print(para.shape)
@@ -592,21 +515,6 @@ def train_Bert_MoE(**kwargs):
                 with open(f"expert_grads_{i}_L2_mean_first_abs", 'a') as file:
                     for item in eval(f"expert_grads_{i}_L2_mean_first_abs"):
                         file.write(str(item) + '\n')
-
-                with open(f"expert_grads_{i}_L1_sub_first_nabs", 'a') as file:
-                    for item in eval(f"expert_grads_{i}_L1_sub_first_nabs"):
-                        file.write(str(item) + '\n')
-                with open(f"expert_grads_{i}_L2_sub_first_nabs", 'a') as file:
-                    for item in eval(f"expert_grads_{i}_L2_sub_first_nabs"):
-                        file.write(str(item) + '\n')
-
-                with open(f"expert_grads_{i}_L1_sub_first_abs", 'a') as file:
-                    for item in eval(f"expert_grads_{i}_L1_sub_first_abs"):
-                        file.write(str(item) + '\n')
-                with open(f"expert_grads_{i}_L2_sub_first_abs", 'a') as file:
-                    for item in eval(f"expert_grads_{i}_L2_sub_first_abs"):
-                        file.write(str(item) + '\n')
-
 
             with open(f"loss_value.txt", 'a') as file:
                     for item in loss_all_array:
