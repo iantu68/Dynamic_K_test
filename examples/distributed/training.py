@@ -280,6 +280,7 @@ def train_Bert_MoE(**kwargs):
     try:
         for epoch in range(num_epochs):
             model.train()
+            count = 0
             step = 0
             loss_all = 0
             loss_log = 0
@@ -290,16 +291,28 @@ def train_Bert_MoE(**kwargs):
             losses = []
             gate_grads_0 = []
             layer_grads_all = []
-            expert_grads_0 = []
-            expert_grads_1 = [] 
-            expert_grads_2 = [] 
-            expert_grads_3 = [] 
-            expert_grads_4 = [] 
-            expert_grads_5 = [] 
-            expert_grads_6 = [] 
-            expert_grads_7 = []  
+            expert_grads_0_L1 = []
+            expert_grads_1_L1 = [] 
+            expert_grads_2_L1 = [] 
+            expert_grads_3_L1 = [] 
+            expert_grads_4_L1 = [] 
+            expert_grads_5_L1 = [] 
+            expert_grads_6_L1 = [] 
+            expert_grads_7_L1 = []
+            expert_grads_0_L2 = []
+            expert_grads_1_L2 = [] 
+            expert_grads_2_L2 = [] 
+            expert_grads_3_L2 = [] 
+            expert_grads_4_L2 = [] 
+            expert_grads_5_L2 = [] 
+            expert_grads_6_L2 = [] 
+            expert_grads_7_L2 = []    
+            loss_all_array = []
+            previous_grads = 0
 
             for batch in train_dataloader:
+                # print(len(train_dataloader))
+                # print(batch)
                 # break
                 batch = {k: v.to(device) for k, v in batch.items()}
                 batch_start = time.time()
@@ -307,20 +320,46 @@ def train_Bert_MoE(**kwargs):
                 loss = outputs.loss
                 loss.backward()
 
+                # if count == len(train_dataloader) - 1:
+                if count % 50 == 0:
+                    #Single Expert gradient output
+                    for name, para in model.named_parameters():
+                        for i in range(8):
+                            expert_grads_L1 = f"expert_grads_{i}_L1"
+                            expert_grads_L2 = f"expert_grads_{i}_L2"
+                            if "bert.encoder.layer.0.moe_linear.experts." + str(i) + ".htoh4.weight" in name:
+                                if previous_grads is not None:
+                                    this_grads = para.grad.view(-1).cpu() 
+                                    grad_change = (this_grads - previous_grads).abs().mean()
+                                    print(grad_change)
+                                    eval(expert_grads_L1).append(grad_change)
+                                previous_grads = this_grads.clone()
 
-                #Single Expert gradient output
-                for name, para in model.named_parameters():
-                    for i in range(8):
-                        expert_grads = f"expert_grads_{i}"
-                        if "bert.encoder.layer.0.moe_linear.experts." + str(i) + ".htoh4.weight" in name:
-                            # slope = para.grad
-                            # print(slope)
-                            this_grads = para.grad.view(-1).cpu()
-                            # print(this_grads)
-                            expert_mean_gradients = this_grads.abs().mean()
-                            # expert_mean_gradients = this_grads.detach().abs().mean()
-                            print(f"expert_grads_{i} : ", expert_mean_gradients)
-                            eval(expert_grads).append(expert_mean_gradients)
+                            if "bert.encoder.layer.0.moe_linear.experts." + str(i) + ".h4toh.weight" in name:
+                                if previous_grads is not None:
+                                    this_grads = para.grad.view(-1).cpu() 
+                                    grad_change = (this_grads - previous_grads).abs().mean()
+                                    print(grad_change)
+                                    eval(expert_grads_L2).append(grad_change)
+                                previous_grads = this_grads.clone()
+
+                                ##########梯度變化率##########
+
+                            
+                    # if "bert.encoder.layer.0.moe_linear.gate.gate.weight" in name:
+                    #     # print(para.shape)
+                    #     current_gate = para.grad.view(-1).cpu()
+                    #     # print(f"layer_0_gate_weight: ", para)
+                    #     # print(f"Layer_0_gate_for_exp_{i}: ", current_gate)
+                    #     # print("current_gate_grads_exp_i: ", current_gate_grads_exp_i)
+                    #     gate_mean_gradients = current_gate.detach().abs().mean()
+                    #     # print(gate_mean_gradients)
+                    #     gate_grads_0.append(gate_mean_gradients)
+                count += 1
+                # print(count)
+
+                        
+
 
                 loss_all += loss.item()
                 losses.append(loss.item())
@@ -347,15 +386,7 @@ def train_Bert_MoE(**kwargs):
                         #     print(f"gate_grads_for_exp_{i} : ", gate_mean_gradients)
                         #     eval(gate_grads).append(gate_mean_gradients)
 
-                    # if "bert.encoder.layer.0.moe_linear.gate.gate.weight" in name:
-                    #     # print(para.shape)
-                    #     current_gate = para.grad.view(-1).cpu()
-                    #     # print(f"layer_0_gate_weight: ", para)
-                    #     # print(f"Layer_0_gate_for_exp_{i}: ", current_gate)
-                    #     # print("current_gate_grads_exp_i: ", current_gate_grads_exp_i)
-                    #     gate_mean_gradients = current_gate.detach().abs().mean()
-                    #     # print(gate_mean_gradients)
-                    #     gate_grads_0.append(gate_mean_gradients)
+                    
 
                     # if "bert.encoder.layer.0.moe_linear.layer_norm.weight" in name:
                     #     layer_grads = para.grad.view(-1).cpu()
@@ -389,6 +420,7 @@ def train_Bert_MoE(**kwargs):
                 if local_rank == 0:
                     progress_bar.set_description('Epoch {} | Loss {:.2f} | acc {:.2f} | mean batch time {:.2f}, mean throttling time {:.2f}, mean comm time {:.2f}'.format(
                                                 epoch, (loss_all/step), best_acc, (elapsed_all/step)*1000, (throttling_costs/step)*1000, (comm_costs/step)*1000) )
+                    loss_all_array.append(loss_all/step)
                     progress_bar.update(1)
 
                 # # 指定要修改的目錄路徑
@@ -403,9 +435,19 @@ def train_Bert_MoE(**kwargs):
             #             file.write(str(item) + '\n')
 
             for i in range(8):
-                with open(f"expert_grads_{i}.txt", 'a') as file:
-                    for item in eval(f"expert_grads_{i}"):
+                with open(f"expert_grads_change_{i}_L1.txt", 'a') as file:
+                    for item in eval(f"expert_grads_{i}_L1"):
                         file.write(str(item) + '\n')
+
+                with open(f"expert_grads_change_{i}_L2.txt", 'a') as file:
+                    for item in eval(f"expert_grads_{i}_L2"):
+                        file.write(str(item) + '\n')
+
+            with open(f"loss_value.txt", 'a') as file:
+                    for item in loss_all_array:
+                        file.write(str(item) + '\n')
+
+            
 
             # with open("gate_grads_0.txt", 'a') as file:
             #     for item in gate_grads_0:

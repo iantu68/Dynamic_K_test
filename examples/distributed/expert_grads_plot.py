@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+import numpy as np
 
 # 读取数据文件
 for i in range(8):
@@ -14,6 +15,7 @@ for i in range(8):
     plt.figure()
     plt.plot(values)
     # plt.scatter(range(len(values)), values, color='b', marker='.', s=10)
+    plt.ylim(0)
     plt.title(f'Layer_0_exp_{i} Gradients Values')
     plt.xlabel('Training Step')
     plt.ylabel('Gradients Value')
