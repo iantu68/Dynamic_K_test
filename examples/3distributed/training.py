@@ -277,8 +277,8 @@ def train_Bert_MoE(**kwargs):
         model = DDP(model, device_ids=[local_rank], moe_sync_group = moe_sync_group)
         model._sync_params()
     
-    # initial_weights = {name: p.data.clone() for name, p in model.named_parameters()}
-    
+    # initial_weights = {name: p.data.clone() for name, p in model.named_parameters()}  
+        
     get_final_gate = False
     
     if get_final_gate == False:
@@ -315,7 +315,11 @@ def train_Bert_MoE(**kwargs):
     # 初始化权重跟踪和收敛率记录
     layer_weights_previous_step = {i: None for i in range(len(model.bert.encoder.layer))}
     layer_convergence_rates = {i: [] for i in range(len(model.bert.encoder.layer))}
-
+    expert_grads_L1_nabs = [[]for i in range(8)]
+    expert_grads_L2_nabs = [[]for i in range(8)]
+    expert_grads_L1_abs = [[]for i in range(8)]
+    expert_grads_L2_abs = [[]for i in range(8)]
+    
     try:
         for epoch in range(num_epochs):
             model.train()
@@ -326,7 +330,6 @@ def train_Bert_MoE(**kwargs):
             elapsed_log = 0
             throttling_costs = 0
             comm_costs = 0
-
             for batch in train_dataloader:
                 # break
                 batch = {k: v.to(device) for k, v in batch.items()}
@@ -338,8 +341,48 @@ def train_Bert_MoE(**kwargs):
                 loss_all += loss.item()
                 optimizer.step()
                 lr_scheduler.step()
-                
-                
+
+
+                if count % 10 == 0:
+                    #Single Expert gradient output
+                    for name, para in model.named_parameters():
+                        for j in range(8):
+                            # expert_grads_L1_nabs = f"expert_grads_{j}_L1_nabs"
+                            # expert_grads_L2_nabs = f"expert_grads_{j}_L2_nabs"
+                            # expert_grads_L1_abs = f"expert_grads_{j}_L1_abs"
+                            # expert_grads_L2_abs = f"expert_grads_{j}_L2_abs"
+
+                            #L1_L2_nabs
+                            if "bert.encoder.layer.0.moe_linear.experts." + str(j) + ".htoh4.weight" in name:
+                                this_grads = para.grad.detach().norm().view(-1).cpu().numpy()
+                                print(f"expert_grads_{j}_L1_nabs: ", this_grads)
+                                expert_grads_L1_nabs[j].extend(this_grads)
+                            elif "bert.encoder.layer.0.moe_linear.experts." + str(j) + ".h4toh.weight" in name:
+                                this_grads = para.grad.detach().norm().view(-1).cpu().numpy()
+                                print(f"expert_grads_{j}_L2_nabs: ", this_grads)
+                                expert_grads_L2_nabs[j].extend(this_grads)
+
+                            # #L1_L2_nabs
+                            # if "bert.encoder.layer.0.moe_linear.experts." + str(j) + ".htoh4.weight" in name:
+                            #     this_grads = para.grad.view(-1).cpu().detach().mean()
+                            #     print(f"expert_grads_{j}_L1_nabs: ", this_grads)
+                            #     eval(expert_grads_L1_nabs).append(this_grads)
+                            # if "bert.encoder.layer.0.moe_linear.experts." + str(j) + ".h4toh.weight" in name:
+                            #     this_grads = para.grad.view(-1).cpu().detach().mean() 
+                            #     print(f"expert_grads_{j}_L2_nabs: ", this_grads)
+                            #     eval(expert_grads_L2_nabs).append(this_grads)
+
+                            # #L1_L2_abs
+                            # if "bert.encoder.layer.0.moe_linear.experts." + str(j) + ".htoh4.weight" in name:
+                            #     this_grads = para.grad.view(-1).cpu().detach().abs().mean()
+                            #     print(f"expert_grads_{j}_L1_abs: ", this_grads)
+                            #     eval(expert_grads_L1_abs).append(this_grads)
+                            # if "bert.encoder.layer.0.moe_linear.experts." + str(j) + ".h4toh.weight" in name:
+                            #     this_grads = para.grad.view(-1).cpu().detach().abs().mean()
+                            #     print(f"expert_grads_{j}_L2_abs: ", this_grads)
+                            #     eval(expert_grads_L2_abs).append(this_grads)
+                count += 1
+
                 for i, layer in enumerate(model.bert.encoder.layer):
                     # 获取当前权重并转移到CPU
                     current_weight = layer.moe_linear.gate.gate.weight.data.cpu() # dtype=float32
@@ -371,7 +414,9 @@ def train_Bert_MoE(**kwargs):
                                 convergence_rate = (norm_diff_t1 - norm_diff_t2) / norm_diff_t1
                                 layer_convergence_rates[i].append(convergence_rate)
                     # 更新当前权重为下一步的"前一步权重"
-                    layer_weights_previous_step[i] = current_weight.clone()   
+                    layer_weights_previous_step[i] = current_weight.clone()    
+                
+               
                
                 optimizer.zero_grad()
                 elapsed_all += time.time() - batch_start
@@ -464,30 +509,51 @@ def train_Bert_MoE(**kwargs):
             #     with open(filename, 'w') as file:
             #         np.savetxt(file, current_weights[i], fmt='%.18e')  # 写入权重到文件
             #     print(f'Epoch {epoch} - Layer {i} current_weight written to {filename}')
-            if get_final_gate == False:
-                # if epoch % 2 == 0:
-                for i, layer in enumerate(model.bert.encoder.layer):
-                    with open(f'normalized_diff/L2_*50_tiny_bert/layer_{i}_{epoch}_normalized_diff.txt', 'w') as f:
-                        f.write(f"{normalized_diffs[i]}") 
-                        print(f"save the normalzied diff")
-                    with open(f'normalized_diff/L2_*50_tiny_bert_current_diff/layer_{i}_{epoch}_current_diff.txt', 'w') as f:
-                        f.write(f"{current_diffs[i]}") 
-                        print(f"save the current diff")
-       
+            # if get_final_gate == False:
+            #     # if epoch % 2 == 0:
+            #     for i, layer in enumerate(model.bert.encoder.layer):
+            #         with open(f'normalized_diff/L2_*50_tiny_bert/layer_{i}_{epoch}_normalized_diff.txt', 'w') as f:
+            #             f.write(f"{normalized_diffs[i]}") 
+            #             print(f"save the normalzied diff")
+            #         with open(f'normalized_diff/L2_*50_tiny_bert_current_diff/layer_{i}_{epoch}_current_diff.txt', 'w') as f:
+            #             f.write(f"{current_diffs[i]}") 
+            #             print(f"save the current diff")
+
+        for i in range(8):
+            # np.save(f"expert_grads_{i}_L1_abs.npy", expert_grads_L1_abs[i])
+            # np.save(f"expert_grads_{i}_L2_abs.npy", expert_grads_L2_abs[i])
+            np.save(f"expert_grads_{i}_L1_nabs.npy", expert_grads_L1_nabs[i])
+            np.save(f"expert_grads_{i}_L2_nabs.npy", expert_grads_L2_nabs[i])
+            
+            
+            # with open(f"expert_grads_{i}_L1_abs.txt", 'a') as file:
+            #     for item in eval(f"expert_grads_{i}_L1_abs"):
+            #         file.write(str(item) + '\n')
+            # with open(f"expert_grads_{i}_L2_abs.txt", 'a') as file:
+            #     for item in eval(f"expert_grads_{i}_L2_abs"):
+            #         file.write(str(item) + '\n')
+
+            # with open(f"expert_grads_{i}_L1_nabs.txt", 'a') as file:
+            #     for item in eval(f"expert_grads_{i}_L1_nabs"):
+            #         file.write(str(item) + '\n')
+            # with open(f"expert_grads_{i}_L2_nabs.txt", 'a') as file:
+            #     for item in eval(f"expert_grads_{i}_L2_nabs"):
+            #         file.write(str(item) + '\n')
         # file_loss = f"loss_curve.txt"
         # with open(file_loss, 'w') as file:
         #     # 将专家计数结果追加到文件中
         #     file.write(f"{loss_values}\n")      
-        for i, layer in enumerate(model.bert.encoder.layer):
-            with open(f'normalized_diff/L2_*50_tiny_bert_current_diff/layer_{i}_{epoch}_reciprocal.txt', 'w') as f:
-                f.write(f"{reciprocal[i]}") 
-                print(f"save the reciprocal")
-            with open(f'normalized_diff/L2_*50_tiny_bert_current_diff/layer_{i}_{epoch}_exponential_decay.txt', 'w') as f:
-                f.write(f"{exponential_decay[i]}") 
-                print(f"save the exponential_decay")
-            with open(f'normalized_diff/L2_*50_tiny_bert_current_diff/layer_{i}_{epoch}_layer_convergence_rates.txt', 'w') as f:
-                f.write(f"{layer_convergence_rates[i]}") 
-                print(f"save the layer_convergence_rates")
+        # for i, layer in enumerate(model.bert.encoder.layer):
+        #     with open(f'normalized_diff/L2_*50_tiny_bert_current_diff/layer_{i}_{epoch}_reciprocal.txt', 'w') as f:
+        #         f.write(f"{reciprocal[i]}") 
+        #         print(f"save the reciprocal")
+        #     with open(f'normalized_diff/L2_*50_tiny_bert_current_diff/layer_{i}_{epoch}_exponential_decay.txt', 'w') as f:
+        #         f.write(f"{exponential_decay[i]}") 
+        #         print(f"save the exponential_decay")
+        #     with open(f'normalized_diff/L2_*50_tiny_bert_current_diff/layer_{i}_{epoch}_layer_convergence_rates.txt', 'w') as f:
+        #         f.write(f"{layer_convergence_rates[i]}") 
+        #         print(f"save the layer_convergence_rates")
+
         
             
     except KeyboardInterrupt:
@@ -508,189 +574,3 @@ def train_Bert_MoE(**kwargs):
     #     with open(file_path, 'w') as file:
     #         for change in changes:
     #             file.write(f"{change}\n")
-                                
-    device = kwargs['device']
-    model = kwargs['model']
-    tokenizer = kwargs['tokenizer']
-    train_batch_size = kwargs['train_batch_size']
-    eval_batch_size = kwargs['eval_batch_size']
-    log_interval = kwargs['log_interval']
-    eval_interval = kwargs['eval_interval']
-    num_epochs = kwargs['num_epochs']
-    logger = kwargs['logger']
-    use_wandb = kwargs['use_wandb']
-    world_size = kwargs['world_size']
-    local_rank = kwargs['local_rank']
-    global_rank = kwargs['global_rank']
-    moe_sync_group = kwargs['moe_sync_group']
-    dist = kwargs['dist']
-    from transformers import DataCollatorWithPadding
-    def postprocess_text(preds, labels):
-        preds = [pred.strip() for pred in preds]
-        labels = [label.strip() for label in labels]
-
-        # rougeLSum expects newline after each sentence
-        preds = ["\n".join(nltk.sent_tokenize(pred)) for pred in preds]
-        labels = ["\n".join(nltk.sent_tokenize(label)) for label in labels]
-
-        return preds, labels
-    
-    dataset = load_dataset("samsum")
-    metric = evaluate.load("rouge")
-
-    def preprocess_function(examples):
-        # inputs = [doc for doc in examples['dialogue']]
-        model_inputs = tokenizer(examples['dialogue'], padding="max_length", max_length=1024, truncation=True)
-        
-        # Setup the tokenizer for targets
-        labels = tokenizer(text_target=examples["summary"], padding="max_length", truncation=True)
-        model_inputs["labels"] = labels["input_ids"]
-
-        return model_inputs
-
-    
-    batch_size=train_batch_size
-    # dataset = load_dataset("yelp_review_full")
-    if tokenizer.pad_token is None:
-        tokenizer.add_special_tokens({'pad_token': '[PAD]'})
-        
-        model.config.pad_token_id = model.config.eos_token_id
-        model.resize_token_embeddings(len(tokenizer))
-
-    tokenized_datasets = dataset.map(preprocess_function,  batched=True)
-    tokenized_datasets.set_format("torch")
-    # tokenized_datasets = tokenized_datasets.remove_columns(["valid"])
-    tokenized_datasets = tokenized_datasets.remove_columns(["dialogue"])
-    tokenized_datasets = tokenized_datasets.remove_columns(["id"])
-    tokenized_datasets = tokenized_datasets.remove_columns(["summary"])
-    
-    train_dataset = tokenized_datasets["train"].shuffle(seed=42) # .select(range(1000))
-    eval_dataset = tokenized_datasets["test"]# .shuffle(seed=42) # .select(range(1000))
-
-    data_collator = DataCollatorForSeq2Seq(
-        tokenizer,
-        model=model,
-        pad_to_multiple_of=None,
-    )
-    
-    data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
-    datasampler = DistributedSampler(train_dataset, num_replicas=world_size, rank=global_rank)
-    train_dataloader = DataLoader(
-        train_dataset, collate_fn=data_collator, batch_size=batch_size,
-        sampler = datasampler
-    )
-    eval_dataloader = DataLoader(eval_dataset, collate_fn=data_collator, batch_size=batch_size)
-
-    optimizer = torch.optim.Adam(model.parameters(),
-                                lr=5e-05,
-                                betas=(0.9,0.999),
-                                eps=1e-08)
-    num_epochs = num_epochs
-    num_training_steps = num_epochs * len(train_dataloader)
-    # lr_scheduler = WarmupLinearSchedule(optimizer, num_warmup_steps=0, num_training_steps=num_training_steps)
-
-    lr_scheduler = get_scheduler(
-        name="linear", optimizer=optimizer, num_warmup_steps=0, num_training_steps=num_training_steps
-    )
-
-    # model.train()
-
-    if local_rank == 0:
-        progress_bar = tqdm(range(num_training_steps))
-    best_acc = 0
-    model_name='gpt'
-
-    if use_wandb is True and local_rank == 0:
-        wandb.init(    # set the wandb project where this run will be logged
-        project="moe",
-        name='moe-gpt2-samsum-gpu-4',
-        settings=wandb.Settings(
-        _stats_sample_rate_seconds=0.1,
-        _stats_samples_to_average=2,
-        ),
-        # track hyperparameters and run metadata
-        config={
-        "learning_rate": 5e-05,
-        "architecture": "gpt2",
-        "dataset": "samsum",
-        "epochs": 1,
-        }
-        )
-
-    # ddp
-    if dist:
-        model = DDP(model, device_ids=[local_rank], moe_sync_group = moe_sync_group)
-        model._sync_params()
-    try:
-        for epoch in range(num_epochs):
-            model.train()
-            step = 0
-            loss_all = 0
-            elapsed_all = 0
-            loss_log = 0
-            elapsed_log = 0
-            throttling_costs = 0
-            comm_costs = 0
-            for batch in train_dataloader:
-                # break
-                batch = {k: v.to(device) for k, v in batch.items()}
-                batch_start = time.time()
-                outputs = model(**batch, training_step = step)
-                loss = outputs.loss
-                loss.backward()
-                loss_all += loss.item()
-                optimizer.step()
-                lr_scheduler.step()
-                optimizer.zero_grad()
-                elapsed_all += time.time() - batch_start
-                step += 1
-                if use_wandb is True and local_rank == 0:
-                    wandb.log({'batch_loss': loss_all/step})
-                    # wandb.log({'batch_loss': loss_all})
-                # break
-                throttling_costs += outputs.total_throttling_costs
-                comm_costs += outputs.total_comm_costs
-                if local_rank == 0:
-                    progress_bar.set_description('Epoch {} | Loss {:.2f} | acc {:.2f} | mean batch time {:.2f}, mean throttling time {:.2f}, mean comm time {:.2f}'.format(
-                                                epoch, (loss_all/step), best_acc, (elapsed_all/step)*1000, (throttling_costs/step)*1000, (comm_costs/step)*1000) )
-                    progress_bar.update(1)
-                torch.cuda.empty_cache()
-            # dict_router = {}
-            # index = 0
-                if step % eval_interval == 0:
-                    model.eval()
-                    for idx, batch in enumerate(eval_dataloader):
-                        batch = {k: v.to(device) for k, v in batch.items()}
-                        with torch.no_grad():
-                            if dist:
-                                outputs = model.module.generate(batch['input_ids'])# (**batch)
-                            else:
-                                outputs = model.generate(batch['input_ids'])# (**batch)
-                            # outputs = model(**batch)
-                        # logits = outputs.logits
-                        # predictions = torch.argmax(logits, dim=-1)
-                        decoded_preds = tokenizer.batch_decode(outputs, skip_special_tokens=True)
-                        decoded_labels = tokenizer.batch_decode(batch["labels"], skip_special_tokens=True)
-
-                        decoded_preds, decoded_labels = postprocess_text(decoded_preds, decoded_labels)
-
-                        metric.add_batch(predictions=decoded_preds, references=decoded_labels)
-                        if idx >= 10:
-                            break
-                    result = metric.compute()
-
-                    if use_wandb is True and local_rank == 0:
-                        wandb.log({'loss': loss_all/step, 'rouge1': result['rouge1']})
-                    if best_acc < result['rouge1']:
-                        save_model(model,model_name)
-                        best_acc = result['rouge1']
-    except KeyboardInterrupt:
-        if use_wandb is True and local_rank == 0:
-            wandb.finish()
-            logger('Exiting from training early')
-
-    if use_wandb is True and local_rank == 0:
-        wandb.finish()
-    del model
-    del dataset
-    del tokenizer

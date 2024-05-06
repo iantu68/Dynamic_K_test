@@ -4,7 +4,6 @@ FMoE core layer
 import time
 import tree
 import os
-import pandas as pd
 import numpy as np
 import torch
 import torch.nn as nn
@@ -17,6 +16,7 @@ from .gates import NaiveGate
 
 from .fastermoe.config import switch_from_env
 
+# 使用歐幾里得距離計算相似度 通過對向量進行標準化（除以模），可以得到餘弦相似度。
 # calculate similarity
 def calculate_similarity(embs, hash_codes):
     dis_func = nn.PairwiseDistance(p=2)
@@ -133,8 +133,6 @@ class FMoE(nn.Module):
     `num_expert` expert modules.
     """
 
-
-
     def __init__(
         self,
         num_expert=32,
@@ -149,28 +147,17 @@ class FMoE(nn.Module):
         gate_hook=None,
         mask=None,
         mask_dict=None,
-
-
-        # self.num_expert = 5
-        # gate_counts = [0] * self.num_expert
-        # print(gate_counts)  # Output: [0, 0, 0, 0, 0]
+        logging_steps=100,
     ):
-        
-        super(FMoE, self).__init__()
+        super().__init__()
         self.num_expert = num_expert
         self.d_model = d_model
         self.world_size = world_size
 
-        self.gate_0_count = 0
-        self.gate_1_count = 0
-        self.gate_2_count = 0
-        self.gate_3_count = 0
-        self.gate_4_count = 0
-        self.gate_5_count = 0
-        self.gate_6_count = 0
-        self.gate_7_count = 0
-
         self.slice_group = slice_group
+        
+        self.global_expert_counts = {}
+
         if mp_group is not None:
             print("[Warning] mp_group is being deprecated")
             self.slice_group = mp_group
@@ -197,6 +184,9 @@ class FMoE(nn.Module):
         self.mask = mask
         self.mask_dict = mask_dict
         self.moe_group = moe_group
+        self.gate_scores_history = []  # Store gate scores for each training step
+        self.logging_steps = logging_steps  # Frequency of logging gate scores
+
 
         if moe_group is not None:
             self.moe_rank = dist.get_rank(group=mp_group)
@@ -213,7 +203,9 @@ class FMoE(nn.Module):
 
         # save token to expert distribution 
         self.tokens_to_experts = []
-
+        self.count_num_zero=0
+        self.num_zero_confirm=0
+        self.last_batch=False
     def expert_fn(self, inp, fwd_expert_count):
         r"""
         The default expert function which either calls the experts as a whole
@@ -255,23 +247,18 @@ class FMoE(nn.Module):
                 mark_module_parallel_comm(self.experts, comm)
         mark_module_parallel_comm(self.gate, "gate")
 
-
-    def forward(self, moe_inp, original_shape, total_experts, top_k, layer_idx, fuse_token=False, training_step=0):
-
-        global gate_0_count, gate_1_count, gate_2_count, gate_3_count, gate_4_count, gate_5_count, gate_6_count, gate_7_count
+    def forward(self, moe_inp, original_shape, total_experts, top_k, layer_idx, fuse_token=False,is_zero=0, is_eval=False,training_step=0,epoch=0,eval_idx=0,eval_num=0,num_eval_subset=0,train_batch_size=0):
         r"""
         The FMoE module first computes gate output, and then conduct MoE forward
         according to the gate.  The score of the selected gate given by the
         expert is multiplied to the experts' output tensors as a weight.
         """
-
         moe_inp_batch_size = tree.flatten(
             tree.map_structure(lambda tensor: tensor.shape[0], moe_inp)
         )
         assert all(
             [batch_size == moe_inp_batch_size[0] for batch_size in moe_inp_batch_size]
         ), "MoE inputs must have the same batch size"
-
         if self.world_size > 1:
 
             def ensure_comm_func(tensor):
@@ -286,7 +273,6 @@ class FMoE(nn.Module):
                 )
 
             moe_inp = tree.map_structure(slice_func, moe_inp)
-    
         gate_top_k_idx, gate_score = self.gate(moe_inp)
         # print(self.gate,gate_top_k_idx, gate_score)
         if self.gate_hook is not None:
@@ -303,58 +289,92 @@ class FMoE(nn.Module):
             mask = self.mask.view(-1)
             moe_inp = tree.map_structure(delete_mask_func, moe_inp)
             gate_top_k_idx = gate_top_k_idx[mask == 0, :]
+         
         
-        gate_0 = torch.nonzero(gate_top_k_idx==0, as_tuple=False).squeeze()
-        # print("gate=0:", gate_0.size(0))
-        gate_1 = torch.nonzero(gate_top_k_idx==1, as_tuple=False).squeeze()
-        gate_2 = torch.nonzero(gate_top_k_idx==2, as_tuple=False).squeeze()
-        gate_3 = torch.nonzero(gate_top_k_idx==3, as_tuple=False).squeeze()
-        gate_4 = torch.nonzero(gate_top_k_idx==4, as_tuple=False).squeeze()
-        gate_5 = torch.nonzero(gate_top_k_idx==5, as_tuple=False).squeeze()
-        gate_6 = torch.nonzero(gate_top_k_idx==6, as_tuple=False).squeeze()
-        gate_7 = torch.nonzero(gate_top_k_idx==7, as_tuple=False).squeeze()
+        if is_eval:
+            
+        
+            gate_scores = gate_score.view(-1, self.top_k)  # Reshape gate scores to (batch_size * top_k)
+            std_file = f"std_file_layer_{layer_idx}.txt"
+            with open(std_file,'a') as std_file:
+                std_file.write(f"epoch:{epoch} training step:{training_step}\n{gate_scores.std().item()}\n")
 
-        self.gate_0_count += gate_0.size(0)
-        self.gate_1_count += gate_1.size(0)
-        self.gate_2_count += gate_2.size(0)
-        self.gate_3_count += gate_3.size(0)
-        self.gate_4_count += gate_4.size(0)
-        self.gate_5_count += gate_5.size(0)
-        self.gate_6_count += gate_6.size(0)
-        self.gate_7_count += gate_7.size(0)
-        # print("gate_0_size:",  self.gate_0_count)
+            step_key = f"epoch {epoch}       step_{training_step}"
+            if step_key not in self.global_expert_counts:
+                self.global_expert_counts[step_key] = [0] * self.num_expert
+                self.count_num_zero=0
+                
+            # output_file = f"step_{training_step}token_to_expert_layer_{layer_idx}.txt"
+            # with open(output_file, 'a') as file:
+            #     for token_idx, expert_idx_tensor in enumerate(gate_top_k_idx):
+            #         if token_idx <= is_zero:  # 只记录 is_zero 之前的 token
 
-        filename = f"gate_count_layer_{layer_idx}.txt"
-        # 檢查檔案是否存在
-        if os.path.isfile(filename):
-            # 讀取檔案中的資料
-            with open(filename, 'r') as file:
-                lines = file.readlines()
+            #             file.write(f"epoch: {epoch} step:{training_step} Token {token_idx}: Routed to Expert {expert_idx_tensor}\n")
+            #             # 遍历 expert_idx_tensor 中的每个元素
+            #             for expert_idx in expert_idx_tensor.tolist():
+            #                 if isinstance(expert_idx, int):
+            #                     self.global_expert_counts[step_key][expert_idx] += 1
+            #                 else:
+            #                     raise ValueError("expert_idx 不是整数")
+            
+            
+            for token_idx, expert_idx_tensor in enumerate(gate_top_k_idx):
+                if token_idx <= is_zero:  # 只记录 is_zero 之前的 token
+                    # 遍历 expert_idx_tensor 中的每个元素
+                    for expert_idx in expert_idx_tensor.tolist():
+                        if isinstance(expert_idx, int):
+                            self.global_expert_counts[step_key][expert_idx] += 1
+                        else:
+                            raise ValueError("expert_idx 不是整数")
+                # print(expert_counts)
+            # print(f"eval_num={eval_num}   eval_idx={eval_idx}")
+            
+            # print(f"num_eval_subset={num_eval_subset}   train_batch_size={train_batch_size}  num_zero_confirm={self.num_zero_confirm}\n")
+            
+            if train_batch_size!=0:
+                if (num_eval_subset/train_batch_size)>self.count_num_zero:
+                    self.num_zero_confirm = (num_eval_subset/train_batch_size)
+            # print(f"count_num_zero={self.count_num_zero}  num_zero={num_zero}  num_zero_confirm={self.num_zero_confirm}\n")
 
-            # 更新相應的欄位值
-            lines[0] = f"'0': {self.gate_0_count}\n"
-            lines[1] = f"'1': {self.gate_1_count}\n"
-            lines[2] = f"'2': {self.gate_2_count}\n"
-            lines[3] = f"'3': {self.gate_3_count}\n"
-            lines[4] = f"'4': {self.gate_4_count}\n"
-            lines[5] = f"'5': {self.gate_5_count}\n"
-            lines[6] = f"'6': {self.gate_6_count}\n"
-            lines[7] = f"'7': {self.gate_7_count}\n"
+            if self.num_zero_confirm > 1:
+                # print(f"train_batch_size={train_batch_size}  eval_num={eval_num}  \n")
+                if train_batch_size != eval_num:
+                    self.last_batch = True
 
-            # 將更新後的資料寫回檔案
-            with open(filename, 'w') as file:
-                file.writelines(lines)
-        else:
-            # 如果檔案不存在，直接寫入
-            with open(filename, 'w') as file:
-                file.write(f"gate_0_count: {self.gate_0_count}\n")
-                file.write(f"gate_1_count: {self.gate_1_count}\n")
-                file.write(f"gate_2_count: {self.gate_2_count}\n")
-                file.write(f"gate_3_count: {self.gate_3_count}\n")
-                file.write(f"gate_4_count: {self.gate_4_count}\n")
-                file.write(f"gate_5_count: {self.gate_5_count}\n")
-                file.write(f"gate_6_count: {self.gate_6_count}\n")
-                file.write(f"gate_7_count: {self.gate_7_count}\n")
+                
+                if self.last_batch:
+                    # print(f"train_batch_size != eval_num=  true")
+                    if eval_num==(eval_idx):
+                        output_file_counts = f"expert_counts_layer_{layer_idx}.txt"
+                        with open(output_file_counts, 'a') as file_counts:
+                            # 将专家计数结果追加到文件中
+                            file_counts.write(f"\n{step_key}_expert_counts\n")
+                            for idx, count in enumerate(self.global_expert_counts[step_key]):
+                                file_counts.write(f"Expert {idx}: {count}  ")
+                        self.last_batch=False
+            else:
+                if eval_num==(eval_idx):
+                        output_file_counts = f"expert_counts_layer_{layer_idx}.txt"
+                        with open(output_file_counts, 'a') as file_counts:
+                            # 将专家计数结果追加到文件中
+                            file_counts.write(f"\n{step_key}_expert_counts\n")
+                            for idx, count in enumerate(self.global_expert_counts[step_key]):
+                                file_counts.write(f"Expert {idx}: {count}  ")
+        
+            # if eval_num==eval_idx:
+                
+                if (self.count_num_zero == num_zero ) == self.num_zero_confirm:
+                    output_file_counts = f"expert_counts_layer_{layer_idx}.txt"
+                    with open(output_file_counts, 'a') as file_counts:
+                        # 将专家计数结果追加到文件中
+                        file_counts.write(f"\n{step_key}_expert_counts\n")
+                        for idx, count in enumerate(self.global_expert_counts[step_key]):
+                            file_counts.write(f"Expert {idx}: {count}  ")
+                self.count_num_zero+=1
+                
+                    
+    
+ 
 
         top_k_value = top_k
         throttling_costs = 0
@@ -366,7 +386,7 @@ class FMoE(nn.Module):
         # # ------------------------------------------------ save gate score ------------------------------------------------ # #
         save_gate_score = False
         if save_gate_score == True:
-            gate_score_save = gate_top_k_idx.clone().detach().cpu().numpy()
+            gate_score_save = gate_top_k_idx.clone().detach().cpu().numpy() # detach與張量無關只有數值
             if training_step == 10:
                 np.savez(f'./workloads/gate_xl/gates_{layer_idx}_device{self.moe_rank}_top2.npz', gate_score_save)
         # # ----------------------------------------------------------------------------------------------------------------- # #
