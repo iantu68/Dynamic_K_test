@@ -615,8 +615,8 @@ def train_Bert_MoE(**kwargs):
             #             file.write(str(item) + '\n')
 
             for i in range(8):
-                np.save(f"expert_grads_{i}_L1_abs.npy", expert_grads_L1_abs[i])
-                np.save(f"expert_grads_{i}_L2_abs.npy", expert_grads_L2_abs[i])
+                # np.save(f"expert_grads_{i}_L1_abs.npy", expert_grads_L1_abs[i])
+                # np.save(f"expert_grads_{i}_L2_abs.npy", expert_grads_L2_abs[i])
                 np.save(f"expert_grads_{i}_L1_nabs.npy", expert_grads_L1_nabs[i])
                 np.save(f"expert_grads_{i}_L2_nabs.npy", expert_grads_L2_nabs[i])
                 # with open(f"expert_grads_{i}_L1_abs.txt", 'a') as file:

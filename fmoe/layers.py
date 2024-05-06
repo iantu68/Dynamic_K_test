@@ -4,6 +4,7 @@ FMoE core layer
 import time
 import tree
 import os
+import pandas as pd
 import numpy as np
 import torch
 import torch.nn as nn
@@ -132,6 +133,8 @@ class FMoE(nn.Module):
     `num_expert` expert modules.
     """
 
+
+
     def __init__(
         self,
         num_expert=32,
@@ -146,11 +149,26 @@ class FMoE(nn.Module):
         gate_hook=None,
         mask=None,
         mask_dict=None,
+
+
+        # self.num_expert = 5
+        # gate_counts = [0] * self.num_expert
+        # print(gate_counts)  # Output: [0, 0, 0, 0, 0]
     ):
-        super().__init__()
+        
+        super(FMoE, self).__init__()
         self.num_expert = num_expert
         self.d_model = d_model
         self.world_size = world_size
+
+        self.gate_0_count = 0
+        self.gate_1_count = 0
+        self.gate_2_count = 0
+        self.gate_3_count = 0
+        self.gate_4_count = 0
+        self.gate_5_count = 0
+        self.gate_6_count = 0
+        self.gate_7_count = 0
 
         self.slice_group = slice_group
         if mp_group is not None:
@@ -237,12 +255,16 @@ class FMoE(nn.Module):
                 mark_module_parallel_comm(self.experts, comm)
         mark_module_parallel_comm(self.gate, "gate")
 
+
     def forward(self, moe_inp, original_shape, total_experts, top_k, layer_idx, fuse_token=False, training_step=0):
+
+        global gate_0_count, gate_1_count, gate_2_count, gate_3_count, gate_4_count, gate_5_count, gate_6_count, gate_7_count
         r"""
         The FMoE module first computes gate output, and then conduct MoE forward
         according to the gate.  The score of the selected gate given by the
         expert is multiplied to the experts' output tensors as a weight.
         """
+
         moe_inp_batch_size = tree.flatten(
             tree.map_structure(lambda tensor: tensor.shape[0], moe_inp)
         )
@@ -264,7 +286,7 @@ class FMoE(nn.Module):
                 )
 
             moe_inp = tree.map_structure(slice_func, moe_inp)
-
+    
         gate_top_k_idx, gate_score = self.gate(moe_inp)
         # print(self.gate,gate_top_k_idx, gate_score)
         if self.gate_hook is not None:
@@ -281,6 +303,58 @@ class FMoE(nn.Module):
             mask = self.mask.view(-1)
             moe_inp = tree.map_structure(delete_mask_func, moe_inp)
             gate_top_k_idx = gate_top_k_idx[mask == 0, :]
+        
+        gate_0 = torch.nonzero(gate_top_k_idx==0, as_tuple=False).squeeze()
+        # print("gate=0:", gate_0.size(0))
+        gate_1 = torch.nonzero(gate_top_k_idx==1, as_tuple=False).squeeze()
+        gate_2 = torch.nonzero(gate_top_k_idx==2, as_tuple=False).squeeze()
+        gate_3 = torch.nonzero(gate_top_k_idx==3, as_tuple=False).squeeze()
+        gate_4 = torch.nonzero(gate_top_k_idx==4, as_tuple=False).squeeze()
+        gate_5 = torch.nonzero(gate_top_k_idx==5, as_tuple=False).squeeze()
+        gate_6 = torch.nonzero(gate_top_k_idx==6, as_tuple=False).squeeze()
+        gate_7 = torch.nonzero(gate_top_k_idx==7, as_tuple=False).squeeze()
+
+        self.gate_0_count += gate_0.size(0)
+        self.gate_1_count += gate_1.size(0)
+        self.gate_2_count += gate_2.size(0)
+        self.gate_3_count += gate_3.size(0)
+        self.gate_4_count += gate_4.size(0)
+        self.gate_5_count += gate_5.size(0)
+        self.gate_6_count += gate_6.size(0)
+        self.gate_7_count += gate_7.size(0)
+        # print("gate_0_size:",  self.gate_0_count)
+
+        filename = f"gate_count_layer_{layer_idx}.txt"
+        # 檢查檔案是否存在
+        if os.path.isfile(filename):
+            # 讀取檔案中的資料
+            with open(filename, 'r') as file:
+                lines = file.readlines()
+
+            # 更新相應的欄位值
+            lines[0] = f"'0': {self.gate_0_count}\n"
+            lines[1] = f"'1': {self.gate_1_count}\n"
+            lines[2] = f"'2': {self.gate_2_count}\n"
+            lines[3] = f"'3': {self.gate_3_count}\n"
+            lines[4] = f"'4': {self.gate_4_count}\n"
+            lines[5] = f"'5': {self.gate_5_count}\n"
+            lines[6] = f"'6': {self.gate_6_count}\n"
+            lines[7] = f"'7': {self.gate_7_count}\n"
+
+            # 將更新後的資料寫回檔案
+            with open(filename, 'w') as file:
+                file.writelines(lines)
+        else:
+            # 如果檔案不存在，直接寫入
+            with open(filename, 'w') as file:
+                file.write(f"gate_0_count: {self.gate_0_count}\n")
+                file.write(f"gate_1_count: {self.gate_1_count}\n")
+                file.write(f"gate_2_count: {self.gate_2_count}\n")
+                file.write(f"gate_3_count: {self.gate_3_count}\n")
+                file.write(f"gate_4_count: {self.gate_4_count}\n")
+                file.write(f"gate_5_count: {self.gate_5_count}\n")
+                file.write(f"gate_6_count: {self.gate_6_count}\n")
+                file.write(f"gate_7_count: {self.gate_7_count}\n")
 
         top_k_value = top_k
         throttling_costs = 0
