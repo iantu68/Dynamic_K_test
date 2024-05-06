@@ -30,10 +30,11 @@ class NaiveGate(BaseGate):
         """
         gate = self.gate(inp)
 
-        ######Design Dropout
+        ######  Design Dropout  ######
         gate_top_k_val, gate_top_k_idx = torch.topk(
             gate, k=self.top_k, dim=-1, largest=True, sorted=False
         )  # [.. x top_k]
+
         gate_top_k_val = gate_top_k_val.view(-1, self.top_k)
 
         # (BxL) x 1 x top_k
