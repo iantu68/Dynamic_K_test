@@ -237,7 +237,7 @@ class FMoE(nn.Module):
                 mark_module_parallel_comm(self.experts, comm)
         mark_module_parallel_comm(self.gate, "gate")
 
-    def forward(self, moe_inp, original_shape, total_experts, top_k, layer_idx, fuse_token=False, training_step=0):
+    def forward(self, moe_inp, original_shape, total_experts, top_k, layer_idx, fuse_token=False, training_step=0, is_zero=0):
         r"""
         The FMoE module first computes gate output, and then conduct MoE forward
         according to the gate.  The score of the selected gate given by the
@@ -265,8 +265,11 @@ class FMoE(nn.Module):
 
             moe_inp = tree.map_structure(slice_func, moe_inp)
 
+        #gate_top_k_idx ==> 被選中的expert 是編號幾
+        #gate_score ==> 被選中的expert 分數是多少
         gate_top_k_idx, gate_score = self.gate(moe_inp)
         # print(self.gate,gate_top_k_idx, gate_score)
+        
         if self.gate_hook is not None:
             self.gate_hook(gate_top_k_idx, gate_score, None)
 
@@ -282,6 +285,18 @@ class FMoE(nn.Module):
             moe_inp = tree.map_structure(delete_mask_func, moe_inp)
             gate_top_k_idx = gate_top_k_idx[mask == 0, :]
 
+        
+        # print(gate_top_k_idx)
+        print("Value of is_zero : ", is_zero)
+
+        # for token_idx, expert_idx_tensor in enumerate(gate_top_k_idx):
+        #     if  token_idx <= is_zero:
+        #         for expert_idx in expert_idx_tensor.tolist():
+
+
+        
+        
+        
         top_k_value = top_k
         throttling_costs = 0
         start_step =0

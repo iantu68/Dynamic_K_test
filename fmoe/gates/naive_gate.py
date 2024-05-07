@@ -31,6 +31,9 @@ class NaiveGate(BaseGate):
         gate = self.gate(inp)
 
         ######  Design Dropout  ######
+        #Property of Dropout => Pdrop = (exp_i / all_exp_grads_SUM)
+        #gate_top_k_val = gate_top_k_val * Pdorp
+        #
         gate_top_k_val, gate_top_k_idx = torch.topk(
             gate, k=self.top_k, dim=-1, largest=True, sorted=False
         )  # [.. x top_k]
