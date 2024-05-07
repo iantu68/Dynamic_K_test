@@ -303,7 +303,7 @@ def train_Bert_MoE(**kwargs):
                 batch_start = time.time()
                 print("Here!!!")
                 #定初始化定義向前傳播
-                outputs = model(**batch, training_step = step, is_zero = 0)#, is_zero = 0)     #初始化is_zero判斷
+                outputs = model(**batch, training_step = step)
                 loss = outputs.loss
                 loss.backward()
                 loss_all += loss.item()
@@ -311,16 +311,6 @@ def train_Bert_MoE(**kwargs):
                 optimizer.step()
                 lr_scheduler.step()
                 # if count == len(train_dataloader) - 1:
-                #print("batch : ", batch)
-                for train_idx, sequence in enumerate(batch['input_ids']):       #train_idx為索引值 / sequence為tensor值
-                    # print("sequence : ", sequence)
-                    # print("train_idx : ", train_idx)
-                    for k, token_value in enumerate(sequence):
-                        if token_value == 102:
-                            is_zero = k
-                            # print("k : ", k)
-                            outputs = model(**batch, training_step = step, is_zero = is_zero)#,  is_zero = is_zero)      #output 向前傳播
-
                 if count % 10 == 0:
                     #Single Expert gradient output
                     for name, para in model.named_parameters():
@@ -413,8 +403,8 @@ def train_Bert_MoE(**kwargs):
             #             file.write(str(item) + '\n')
 
             for i in range(8):
-                np.save(f"expert_grads_{i}_L1_abs.npy", expert_grads_L1_abs[i])
-                np.save(f"expert_grads_{i}_L2_abs.npy", expert_grads_L2_abs[i])
+                # np.save(f"expert_grads_{i}_L1_abs.npy", expert_grads_L1_abs[i])
+                # np.save(f"expert_grads_{i}_L2_abs.npy", expert_grads_L2_abs[i])
                 np.save(f"expert_grads_{i}_L1_nabs.npy", expert_grads_L1_nabs[i])
                 np.save(f"expert_grads_{i}_L2_nabs.npy", expert_grads_L2_nabs[i])
 
