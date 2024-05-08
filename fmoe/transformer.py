@@ -6,6 +6,7 @@ import torch.nn as nn
 from .layers import FMoE
 from .linear import FMoELinear
 from .fastermoe.config import switch_from_env
+from typing import Optional
 
 class _Expert(nn.Module):
     r"""
@@ -60,15 +61,17 @@ class FMoETransformerMLP(FMoE):
         self.total_experts = num_expert * world_size
         self.top_k = kwargs.get('top_k')
 
-    def forward(self, inp: torch.Tensor, layer_idx = 0,  training_step=0, fuse_token=False):
+    def forward(self, inp: torch.Tensor, layer_idx = 0,  training_step=0, fuse_token=False, batch_padding_mask=None):   #Optional[torch.Tensor] = None
         r"""
         This module wraps up the FMoE module with reshape, residual and layer
         normalization.
         """
-        # print("change successful: ", fuse_token)
+        # print("change successful: ", fuse_token)\
+        print(batch_padding_mask)
         original_shape = inp.shape
         inp = inp.reshape(-1, self.d_model)
         output, fusion_costs, comm_time, traffic_size = super().forward(inp, original_shape, self.total_experts, self.top_k, 
-                                                                        layer_idx = layer_idx, fuse_token=fuse_token, training_step=training_step)
+                                                                        layer_idx = layer_idx, fuse_token=fuse_token, training_step=training_step,
+                                                                        batch_padding_mask=batch_padding_mask)
         # return output.reshape(original_shape), fusion_costs, comm_time, traffic_size
         return output.reshape(original_shape), fusion_costs, comm_time

@@ -11,6 +11,7 @@ import os
 import time
 import matplotlib.pyplot as plt
 import modeling
+import pandas as pd
 
 # from symbol import parameters
 dir_path = os.path.dirname(os.path.realpath(__file__))
@@ -121,6 +122,7 @@ def train_Bert_MoE(**kwargs):
 
     max_length = 384
     stride = 128
+    loss_values = []  # 空列表來儲存每步的損失值
 
     def preprocess_training_examples(examples):
         questions = [q.strip() for q in examples["question"]]
@@ -134,12 +136,18 @@ def train_Bert_MoE(**kwargs):
             return_offsets_mapping=True,
             padding="max_length",
         )
-
+        masks = torch.tensor(inputs['attention_mask'], dtype=torch.bool)
+        # masks = torch.Tensor(inputs['attention_mask'])
+        # print("Masks : ", masks)
+        # model(masks=masks)        #將mask 值外傳
+        # print("masks : ", masks)
         offset_mapping = inputs.pop("offset_mapping")
         sample_map = inputs.pop("overflow_to_sample_mapping")
         answers = examples["answers"]
         start_positions = []
         end_positions = []
+        training_padding_mask = [masks[i] for i in sample_map]
+        inputs['train_padding_mask'] = training_padding_mask
 
         for i, offset in enumerate(offset_mapping):
             sample_idx = sample_map[i]
@@ -209,13 +217,14 @@ def train_Bert_MoE(**kwargs):
     datasets = load_dataset("squad")
     # raw_datasets  = raw_datasets.train_test_split(test_size=0.2)
     # raw_datasets  = raw_datasets.rename_column("test", "validation")
-    # metric = evaluate.load("squad")
+    metric = evaluate.load("squad")
     # tokenized_squad = dataset.map(preprocess_function, batched=True, remove_columns=dataset["train"].column_names)
     train_dataset = datasets["train"].map(
         preprocess_training_examples,
         batched=True,
         remove_columns=datasets["train"].column_names,
     )
+    # print("train_data : ", train_dataset)
     # eval_dataset = datasets["validation"].map(
     #     preprocess_validation_examples,
     #     batched=True,
@@ -300,10 +309,14 @@ def train_Bert_MoE(**kwargs):
                 # print(batch['input_ids'])
                 # break
                 batch = {k: v.to(device) for k, v in batch.items()}
+                batch_padding_mask = batch['train_padding_mask']
+                batch.pop('train_padding_mask', None)  # 移除 'train_padding_mask' 键
+                # print(batch_padding_mask)
+
                 batch_start = time.time()
                 print("Here!!!")
                 #定初始化定義向前傳播
-                outputs = model(**batch, training_step = step)
+                outputs = model(**batch, training_step = step, batch_padding_mask = batch_padding_mask)
                 loss = outputs.loss
                 loss.backward()
                 loss_all += loss.item()

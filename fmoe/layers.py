@@ -15,6 +15,7 @@ from .functions import AllGather, Slice
 from .gates import NaiveGate
 
 from .fastermoe.config import switch_from_env
+from typing import Optional
 
 # calculate similarity
 def calculate_similarity(embs, hash_codes):
@@ -237,7 +238,7 @@ class FMoE(nn.Module):
                 mark_module_parallel_comm(self.experts, comm)
         mark_module_parallel_comm(self.gate, "gate")
 
-    def forward(self, moe_inp, original_shape, total_experts, top_k, layer_idx, fuse_token=False, training_step=0):
+    def forward(self, moe_inp, original_shape, total_experts, top_k, layer_idx, fuse_token=False, training_step=0, batch_padding_mask: Optional[torch.Tensor] = None):
         r"""
         The FMoE module first computes gate output, and then conduct MoE forward
         according to the gate.  The score of the selected gate given by the
@@ -288,7 +289,7 @@ class FMoE(nn.Module):
         
         # print(gate_top_k_idx)
    
-        
+        print("batch_padding_mask: ", batch_padding_mask)
         
         top_k_value = top_k
         throttling_costs = 0
