@@ -505,21 +505,23 @@ class CustomizedMoEPositionwiseFF(FMoETransformerMLP):
 
     def forward(self, inp, layer_idx, training_step, batch_padding_mask):
         ######################################################
-        if batch_padding_mask is not None:
-            print("CustomizedMoEPositionwiseFF_Pass")
-        else:
-            print("CustomizedMoEPositionwiseFF_Fail")
-            ######################################################
+        # if batch_padding_mask is not None:
+        #     print("CustomizedMoEPositionwiseFF_Pass")
+        #     print(batch_padding_mask)
+        #     print("=" * 30)
+        # else:
+        #     print("CustomizedMoEPositionwiseFF_Fail")
+        ######################################################
         if self.pre_lnorm:
             ##### layer normalization + positionwise feed-forward
-            core_out, fusion_costs, comm_time = super().forward(self.layer_norm(inp), layer_idx, training_step, batch_padding_mask)
+            core_out, fusion_costs, comm_time = super().forward(self.layer_norm(inp), layer_idx, training_step, False,  batch_padding_mask)
             core_out = self.dropout(core_out)
 
             ##### residual connection
             output = core_out + inp
         else:
             ##### positionwise feed-forward
-            core_out, fusion_costs, comm_time = super().forward(inp, layer_idx, training_step, batch_padding_mask)
+            core_out, fusion_costs, comm_time = super().forward(inp, layer_idx, training_step, False, batch_padding_mask)
             core_out = self.dropout(core_out)
 
             ##### residual connection + layer normalization
@@ -566,10 +568,12 @@ class BertLayer(nn.Module):
 
     ) -> Tuple[torch.Tensor]:
         # decoder uni-directional self-attention cached key/values tuple is at positions 1,2
-        if BertLayer is not None:
-            print("BertLayer_Pass")
-        else:
-            print("BertLayer_Fail")
+        # if batch_padding_mask is not None:
+        #     print("BertLayer_Pass")
+        #     # print(batch_padding_mask)
+        #     print("=" * 30)
+        # else:
+        #     print("BertLayer_Fail")
         self_attn_past_key_value = past_key_value[:2] if past_key_value is not None else None
         self_attention_outputs = self.attention(
             hidden_states,
@@ -673,10 +677,13 @@ class BertEncoder(nn.Module):
         next_decoder_cache = () if use_cache else None
         total_throttling_costs = 0
         total_comm_costs = 0
-        if batch_padding_mask is not None:
-            print("BertEncoder_Pass")
-        else:
-            print("BertEncoder_fail")
+        # if batch_padding_mask is not None:
+        #     print("BertEncoder_Pass")
+        #     # print(batch_padding_mask)
+        #     print("=" * 30)
+            
+        # else:
+        #     print("BertEncoder_fail")
 
         for i, layer_module in enumerate(self.layer):
             if output_hidden_states:
@@ -1123,12 +1130,12 @@ class BertModel(BertPreTrainedModel):
             inputs_embeds=inputs_embeds,
             past_key_values_length=past_key_values_length,
         )
-        if batch_padding_mask is not None:
-            print("BertModel_Pass")
-            print(batch_padding_mask)
-            print("=" * 30)
-        else:
-            print("BertModel_Fail")
+        # if batch_padding_mask is not None:
+        #     print("BertModel_Pass")
+        #     # print(batch_padding_mask)
+        #     print("=" * 30)
+        # else:
+        #     print("BertModel_Fail")
         encoder_outputs = self.encoder(
             embedding_output,
             attention_mask=extended_attention_mask,
@@ -1963,12 +1970,12 @@ class BertForQuestionAnswering(BertPreTrainedModel):
             Positions are clamped to the length of the sequence (`sequence_length`). Position outside of the sequence
             are not taken into account for computing the loss.
         """
-        if batch_padding_mask is not None:
-            print("BertForQuestionAnswering_Pass")
-            # print("batch_padding_mask = ", batch_padding_mask)
-            print("=" * 30)
-        else:
-            print("BertForQuestionAnswering_Fail")
+        # if batch_padding_mask is not None:
+        #     print("BertForQuestionAnswering_Pass")
+        #     # print("batch_padding_mask = ", batch_padding_mask)
+        #     print("=" * 30)
+        # else:
+        #     print("BertForQuestionAnswering_Fail")
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
         outputs = self.bert(

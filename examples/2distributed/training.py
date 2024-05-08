@@ -285,8 +285,12 @@ def train_Bert_MoE(**kwargs):
 
     # 在訓練之前，獲取模型每一層的初始權重
     initial_weights = {name: p.data.clone() for name, p in model.named_parameters()}
-    expert_grads_L1_nabs = [[]for i in range(8)]
-    expert_grads_L2_nabs = [[]for i in range(8)]
+    expert_grads_L0_FFN0_nabs = [[]for i in range(8)]
+    expert_grads_L0_FFN1_nabs = [[]for i in range(8)]
+    expert_grads_L1_FFN0_nabs = [[]for i in range(8)]
+    expert_grads_L1_FFN1_nabs = [[]for i in range(8)]
+
+
     expert_grads_L1_abs = [[]for i in range(8)]
     expert_grads_L2_abs = [[]for i in range(8)]
     try:
@@ -314,7 +318,7 @@ def train_Bert_MoE(**kwargs):
                 # print(batch_padding_mask)
 
                 batch_start = time.time()
-                print("Here!!!")
+                # print("Here!!!")
                 #定初始化定義向前傳播
                 outputs = model(**batch, training_step = step, batch_padding_mask = batch_padding_mask)
                 loss = outputs.loss
@@ -327,16 +331,18 @@ def train_Bert_MoE(**kwargs):
                 if count % 10 == 0:
                     #Single Expert gradient output
                     for name, para in model.named_parameters():
-                        for i in range(8):
+                        for i in range(2):
+                            for j in range(8):
                             #L1_L2_nabs
-                                if "bert.encoder.layer.0.moe_linear.experts." + str(i) + ".htoh4.weight" in name:
+                                if "bert.encoder.layer." + str(i) +".moe_linear.experts." + str(j) + ".htoh4.weight" in name:
                                     this_grads = para.grad.detach().norm().view(-1).cpu().numpy()
-                                    # print(f"expert_grads_{i}_L1_nabs: ", this_grads)
-                                    expert_grads_L1_nabs[i].extend(this_grads)
-                                elif "bert.encoder.layer.0.moe_linear.experts." + str(i) + ".h4toh.weight" in name:
+                                    print(f"expert_grads_L{i}_FFN0_nabs[{j}]", this_grads)
+                                    eval(f"expert_grads_L{i}_FFN0_nabs[{j}]").extend(this_grads)
+                                elif "bert.encoder.layer." + str(i) +".moe_linear.experts." + str(i) + ".h4toh.weight" in name:
                                     this_grads = para.grad.detach().norm().view(-1).cpu().numpy()
-                                    # print(f"expert_grads_{i}_L2_nabs: ", this_grads)
-                                    expert_grads_L2_nabs[i].extend(this_grads)
+                                    print(f"expert_grads_L{i}_FFN1_nabs[{j}] : ", this_grads)
+                                    eval(f"expert_grads_L{i}_FFN1_nabs[{j}]").extend(this_grads)
+
                     # if "bert.encoder.layer.0.moe_linear.gate.gate.weight" in name:
                     #     # print(para.shape)
                     #     current_gate = para.grad.view(-1).cpu()
@@ -416,10 +422,10 @@ def train_Bert_MoE(**kwargs):
             #             file.write(str(item) + '\n')
 
             for i in range(8):
-                # np.save(f"expert_grads_{i}_L1_abs.npy", expert_grads_L1_abs[i])
-                # np.save(f"expert_grads_{i}_L2_abs.npy", expert_grads_L2_abs[i])
-                np.save(f"expert_grads_{i}_L1_nabs.npy", expert_grads_L1_nabs[i])
-                np.save(f"expert_grads_{i}_L2_nabs.npy", expert_grads_L2_nabs[i])
+                np.save(f"expert_grads_L0_FFN0_{i}_nabs.npy", expert_grads_L0_FFN0_nabs[i])
+                np.save(f"expert_grads_L0_FFN1_{i}_nabs.npy", expert_grads_L0_FFN1_nabs[i])
+                np.save(f"expert_grads_L1_FFN0_{i}_nabs.npy", expert_grads_L1_FFN0_nabs[i])
+                np.save(f"expert_grads_L1_FFN1_{i}_nabs.npy", expert_grads_L1_FFN1_nabs[i])
 
             # with open(f"loss_value.txt", 'a') as file:
             #         for item in loss_all_array:

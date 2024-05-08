@@ -67,7 +67,7 @@ class FMoETransformerMLP(FMoE):
         normalization.
         """
         # print("change successful: ", fuse_token)\
-        print(batch_padding_mask)
+        # print(batch_padding_mask)
         original_shape = inp.shape
         inp = inp.reshape(-1, self.d_model)
         output, fusion_costs, comm_time, traffic_size = super().forward(inp, original_shape, self.total_experts, self.top_k, 

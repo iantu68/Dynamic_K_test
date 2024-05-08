@@ -196,6 +196,8 @@ class FMoE(nn.Module):
 
         # save token to expert distribution 
         self.tokens_to_experts = []
+        self.global_expert_counts = {}
+        self.layer_experts_counts = {}
 
     def expert_fn(self, inp, fwd_expert_count):
         r"""
@@ -286,11 +288,44 @@ class FMoE(nn.Module):
             moe_inp = tree.map_structure(delete_mask_func, moe_inp)
             gate_top_k_idx = gate_top_k_idx[mask == 0, :]
 
-        
-        # print(gate_top_k_idx)
-   
-        print("batch_padding_mask: ", batch_padding_mask)
-        
+
+        experts_counts = [0] * self.num_expert
+        rebatch_padding_mask = batch_padding_mask.view(-1) 
+
+        #計算專家激活次數
+        for i in range(self.num_expert):
+            # num = torch.nonzero(gate_top_k_idx[rebatch_padding_mask][:,0] == i).view(-1).size(0)
+            # num += torch.nonzero(gate_top_k_idx[rebatch_padding_mask][:,1] == i).view(-1).size(0)
+            
+            # 计算当前专家作为第一选择的次数
+            count_first_choice = torch.nonzero(gate_top_k_idx[rebatch_padding_mask][:, 0] == i, as_tuple=False).size(0)
+            # 计算当前专家作为第二选择的次数
+            count_second_choice = torch.nonzero(gate_top_k_idx[rebatch_padding_mask][:, 1] == i, as_tuple=False).size(0)
+            # 将两个计数相加得到总激活次数
+            experts_counts[i] = count_first_choice + count_second_choice
+        # self.experts_counts = [sum(x) for x in zip(self.experts_counts, experts_counts)]
+            
+        if layer_idx not in self.layer_experts_counts:
+            self.layer_experts_counts[layer_idx] = experts_counts
+        else:
+            self.layer_experts_counts[layer_idx] = [
+                sum(x) for x in zip(self.layer_experts_counts[layer_idx], experts_counts)
+            ]
+
+
+        output_file_counts = f"expert_counts_layer_{layer_idx}.txt"
+        # print("output_file_counts", output_file_counts)
+        with open(output_file_counts, 'w') as file_counts:
+            # 将专家计数结果追加到文件中
+            file_counts.write(f"experts_counts_layer_{layer_idx}={self.layer_experts_counts[layer_idx]}\n")
+
+
+
+
+
+
+
+
         top_k_value = top_k
         throttling_costs = 0
         start_step =0
