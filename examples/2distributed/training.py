@@ -265,7 +265,7 @@ def train_Bert_MoE(**kwargs):
         )
 
     optimizer = torch.optim.Adam(model.parameters(),
-                                lr=3e-5)                        #學習率調整
+                                lr=5e-05)                        #學習率調整
                                 # betas=(0.9,0.999),
                                 # eps=1e-08)
     # num_epochs = 8
@@ -338,7 +338,7 @@ def train_Bert_MoE(**kwargs):
                                     this_grads = para.grad.detach().norm().view(-1).cpu().numpy()
                                     print(f"expert_grads_L{i}_FFN0_nabs[{j}]", this_grads)
                                     eval(f"expert_grads_L{i}_FFN0_nabs[{j}]").extend(this_grads)
-                                elif "bert.encoder.layer." + str(i) +".moe_linear.experts." + str(i) + ".h4toh.weight" in name:
+                                elif "bert.encoder.layer." + str(i) +".moe_linear.experts." + str(j) + ".h4toh.weight" in name:
                                     this_grads = para.grad.detach().norm().view(-1).cpu().numpy()
                                     print(f"expert_grads_L{i}_FFN1_nabs[{j}] : ", this_grads)
                                     eval(f"expert_grads_L{i}_FFN1_nabs[{j}]").extend(this_grads)

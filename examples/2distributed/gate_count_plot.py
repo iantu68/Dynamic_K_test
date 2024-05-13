@@ -1,23 +1,32 @@
+import numpy as np
 import matplotlib.pyplot as plt
 
-# Data
-data = {'0': 5864742,
-'1': 10806993,
-'2': 8129672,
-'3': 23899507,
-'4': 42307600,
-'5': 5183870,
-'6': 24886997,
-'7': 14893486,
-}
-# Create bar chart
-plt.figure(figsize=(10,6))
-plt.bar(range(len(data)), data.values(), align='center')
-plt.xticks(range(len(data)), list(data.keys()))
-plt.xlabel('Gate Number')
-plt.ylabel('Count')
-plt.title('Bert_Tiny_Layer1')
-plt.ylim(0, 50000000)
-# Save plot as a PDF file
-plt.savefig('Bert_Tiny_Layer1', bbox_inches='tight')
+# 两个数组
+experts_counts_layer_0=[5200154, 4439297, 20364888, 3595065, 10742478, 5274477, 1538936, 9569513]
+experts_counts_layer_1=[5886269, 14279243, 2723314, 2159586, 8434003, 8827661, 11437242, 6977490]
+
+# 设置直方图的边界和中心
+bin_edges = np.arange(len(experts_counts_layer_1) + 1)
+bin_centers = bin_edges[:-1]
+
+# 每个条形的宽度
+bar_width = 0.5
+
+# 绘制直方图
+# plt.bar(bin_centers, experts_counts_layer_0, color='blue', width=bar_width, label='Layer 0')
+plt.bar(bin_centers + bar_width, experts_counts_layer_0, color='blue', width=bar_width, label='Layer 1')
+
+# 添加标签和标题
+plt.xlabel('Expert Index')
+plt.ylabel('Counts')
+plt.title('Expert Counts by Layer')
+plt.xticks(bin_centers + bar_width / 2, range(len(experts_counts_layer_1)))
+
+# 添加图例
+plt.legend(loc='upper right')
+
+# 保存图像
+plt.savefig('Expert_count_Layer0.png')
+
+# 显示图形
 plt.show()

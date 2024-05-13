@@ -33,9 +33,9 @@ def Create_MoE_Model(**kwargs):
     # bert
     if kwargs['model_name'] == 'bert':
         from transformers import BertForQuestionAnswering
-        tokenizer = AutoTokenizer.from_pretrained("prajjwal1/bert-tiny")
-        config = AutoConfig.from_pretrained("prajjwal1/bert-tiny")
-        config_load = AutoConfig.from_pretrained("prajjwal1/bert-tiny")
+        tokenizer = AutoTokenizer.from_pretrained("prajjwal1/bert-small")
+        config = AutoConfig.from_pretrained("prajjwal1/bert-small")
+        config_load = AutoConfig.from_pretrained("prajjwal1/bert-small")
         config.moe = kwargs['moe']
         config.moe_num_experts = kwargs['moe_num_experts']
         config.moe_top_k = kwargs['moe_top_k']
