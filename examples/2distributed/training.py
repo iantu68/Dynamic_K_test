@@ -257,7 +257,7 @@ def train_Bert_MoE(**kwargs):
         ),
         # track hyperparameters and run metadata
         config={
-        "learning_rate": 100e-05,
+        "learning_rate": 5e-05,
         "architecture": "bert",
         "dataset": "squad",
         "epochs": 1,
@@ -265,7 +265,7 @@ def train_Bert_MoE(**kwargs):
         )
 
     optimizer = torch.optim.Adam(model.parameters(),
-                                lr=100e-05)                        #學習率調整
+                                lr=5e-05)                        #學習率調整
                                 # betas=(0.9,0.999),
                                 # eps=1e-08)
     # num_epochs = 8
