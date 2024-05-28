@@ -15,7 +15,7 @@ from .functions import AllGather, Slice
 from .gates import NaiveGate
 
 from .fastermoe.config import switch_from_env
-from typing import Optional
+from typing import Optional, List
 
 # calculate similarity
 def calculate_similarity(embs, hash_codes):
@@ -240,12 +240,16 @@ class FMoE(nn.Module):
                 mark_module_parallel_comm(self.experts, comm)
         mark_module_parallel_comm(self.gate, "gate")
 
-    def forward(self, moe_inp, original_shape, total_experts, top_k, layer_idx, fuse_token=False, training_step=0, batch_padding_mask: Optional[torch.Tensor] = None):
+    def forward(self, moe_inp, original_shape, total_experts, top_k, layer_idx, fuse_token=False, training_step=0, batch_padding_mask: Optional[torch.Tensor] = None,
+                expert_grads_L0_FFN0_nabs : Optional[List] = None, expert_grads_L0_FFN1_nabs : Optional[List] = None, expert_grads_L1_FFN0_nabs : Optional[List] = None, 
+                expert_grads_L1_FFN1_nabs : Optional[List] = None, ):
         r"""
         The FMoE module first computes gate output, and then conduct MoE forward
         according to the gate.  The score of the selected gate given by the
         expert is multiplied to the experts' output tensors as a weight.
         """
+
+        #找尋方法將expert_grads_L0_FFN0_nabs  輸入到gate 進行判斷。
         moe_inp_batch_size = tree.flatten(
             tree.map_structure(lambda tensor: tensor.shape[0], moe_inp)
         )
@@ -290,6 +294,8 @@ class FMoE(nn.Module):
 
 
         experts_counts = [0] * self.num_expert
+        # print("********Layer.py**********")
+        # print(batch_padding_mask)
         rebatch_padding_mask = batch_padding_mask.view(-1) 
 
         #計算專家激活次數
@@ -318,13 +324,6 @@ class FMoE(nn.Module):
         with open(output_file_counts, 'w') as file_counts:
             # 将专家计数结果追加到文件中
             file_counts.write(f"experts_counts_layer_{layer_idx}={self.layer_experts_counts[layer_idx]}\n")
-
-
-
-
-
-
-
 
         top_k_value = top_k
         throttling_costs = 0
