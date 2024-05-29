@@ -32,9 +32,6 @@ from fmoe.distributed import DistributedGroupedDataParallel as DDP
 
 os.environ['TRANSFORMERS_NO_ADVISORY_WARNINGS'] = 'true'
 
-
-
-
 # train bert
 def train_Bert_MoE(**kwargs):
     device = kwargs['device']
@@ -122,7 +119,6 @@ def train_Bert_MoE(**kwargs):
 
     max_length = 384
     stride = 128
-    loss_values = []  # 空列表來儲存每步的損失值
 
     def preprocess_training_examples(examples):
         questions = [q.strip() for q in examples["question"]]
@@ -225,12 +221,12 @@ def train_Bert_MoE(**kwargs):
         remove_columns=datasets["train"].column_names,
     )
     # print("train_data : ", train_dataset)
-    # eval_dataset = datasets["validation"].map(
-    #     preprocess_validation_examples,
-    #     batched=True,
-    #     remove_columns=datasets["validation"].column_names,
-    # )
-    # validation_dataset = eval_dataset.remove_columns(["example_id", "offset_mapping"])
+    eval_dataset = datasets["validation"].map(
+        preprocess_validation_examples,
+        batched=True,
+        remove_columns=datasets["validation"].column_names,
+    )
+    validation_dataset = eval_dataset.remove_columns(["example_id", "offset_mapping"])
 
     data_collator = DefaultDataCollator()
 
@@ -243,26 +239,26 @@ def train_Bert_MoE(**kwargs):
     # train_dataloader = DataLoader(
     #     train_dataset, shuffle=True, collate_fn=data_collator, batch_size=batch_size
     # )
-    # eval_dataloader = DataLoader(validation_dataset, collate_fn=data_collator, batch_size=batch_size)
+    eval_dataloader = DataLoader(validation_dataset, collate_fn=data_collator, batch_size=batch_size)
     num_epochs = num_epochs
     model_name="bert" # config1[some_args]['model']
     # metric = evaluate.load("squad_v2" if data_args.version_2_with_negative else "squad")
-    if use_wandb is True and local_rank == 0:
-        wandb.init(    # set the wandb project where this run will be logged
-        project="moe",
-        name='moe-bert-gpu-4',
-        settings=wandb.Settings(
-        _stats_sample_rate_seconds=0.1,
-        _stats_samples_to_average=1,
-        ),
-        # track hyperparameters and run metadata
-        config={
-        "learning_rate": 5e-05,
-        "architecture": "bert",
-        "dataset": "squad",
-        "epochs": 1,
-        }
-        )
+    # if use_wandb is True and local_rank == 0:
+    #     wandb.init(    # set the wandb project where this run will be logged
+    #     project="moe",
+    #     name='moe-bert-gpu-4',
+    #     settings=wandb.Settings(
+    #     _stats_sample_rate_seconds=0.1,
+    #     _stats_samples_to_average=1,
+    #     ),
+    #     # track hyperparameters and run metadata
+    #     config={
+    #     "learning_rate": 5e-05,
+    #     "architecture": "bert",
+    #     "dataset": "squad",
+    #     "epochs": 1,
+    #     }
+    #     )
 
     optimizer = torch.optim.Adam(model.parameters(),
                                 lr=5e-05)                        #學習率調整
@@ -289,25 +285,33 @@ def train_Bert_MoE(**kwargs):
     expert_grads_L0_FFN1_nabs = [[]for i in range(8)]
     expert_grads_L1_FFN0_nabs = [[]for i in range(8)]
     expert_grads_L1_FFN1_nabs = [[]for i in range(8)]
+    # expert_grads_L2_FFN0_nabs = [[]for i in range(8)]
+    # expert_grads_L2_FFN1_nabs = [[]for i in range(8)]
+    # expert_grads_L3_FFN0_nabs = [[]for i in range(8)]
+    # expert_grads_L3_FFN1_nabs = [[]for i in range(8)]
 
 
     expert_grads_L1_abs = [[]for i in range(8)]
     expert_grads_L2_abs = [[]for i in range(8)]
+
+
+    count = 0
+    step = 0
+    loss_all = 0
+    loss_log = 0
+    elapsed_all = 0
+    elapsed_log = 0
+    throttling_costs = 0
+    comm_costs = 0
+    accuracy = 0
+    count = 1
+    losses = []
+    acc = []
+    gate_grads_0 = []
     try:
         for epoch in range(num_epochs):
             model.train()
-            count = 0
-            step = 0
-            loss_all = 0
-            loss_log = 0
-            elapsed_all = 0
-            elapsed_log = 0
-            throttling_costs = 0
-            comm_costs = 0
-            losses = []
-            gate_grads_0 = []
-
-
+            start_time = time.time()
             for batch in train_dataloader:
                 # print(len(train_dataloader))
                 # print(batch['input_ids'])
@@ -320,7 +324,10 @@ def train_Bert_MoE(**kwargs):
                 batch_start = time.time()
                 # print("Here!!!")
                 #定初始化定義向前傳播
-                outputs = model(**batch, training_step = step, batch_padding_mask = batch_padding_mask)
+                # print("="*10 + "Training.py" + "="*10)
+                outputs = model(**batch, training_step = step, batch_padding_mask = batch_padding_mask,)
+                                # expert_grads_L0_FFN0_nabs = expert_grads_L0_FFN0_nabs, expert_grads_L0_FFN1_nabs = expert_grads_L0_FFN1_nabs, 
+                                # expert_grads_L1_FFN0_nabs = expert_grads_L1_FFN0_nabs, expert_grads_L1_FFN1_nabs = expert_grads_L1_FFN1_nabs)
                 loss = outputs.loss
                 loss.backward()
                 loss_all += loss.item()
@@ -328,7 +335,9 @@ def train_Bert_MoE(**kwargs):
                 optimizer.step()
                 lr_scheduler.step()
                 # if count == len(train_dataloader) - 1:
-                if count % 10 == 0:
+                # print(count)
+                if count % len(train_dataloader) == 0:
+                    print ("===============catch===============")
                     #Single Expert gradient output
                     for name, para in model.named_parameters():
                         for i in range(2):
@@ -336,139 +345,90 @@ def train_Bert_MoE(**kwargs):
                             #L1_L2_nabs
                                 if "bert.encoder.layer." + str(i) +".moe_linear.experts." + str(j) + ".htoh4.weight" in name:
                                     this_grads = para.grad.detach().norm().view(-1).cpu().numpy()
-                                    print(f"expert_grads_L{i}_FFN0_nabs[{j}]", this_grads)
+                                    # print(f"expert_grads_L{i}_FFN0_nabs[{j}]", this_grads)
                                     eval(f"expert_grads_L{i}_FFN0_nabs[{j}]").extend(this_grads)
                                 elif "bert.encoder.layer." + str(i) +".moe_linear.experts." + str(j) + ".h4toh.weight" in name:
                                     this_grads = para.grad.detach().norm().view(-1).cpu().numpy()
-                                    print(f"expert_grads_L{i}_FFN1_nabs[{j}] : ", this_grads)
-                                    eval(f"expert_grads_L{i}_FFN1_nabs[{j}]").extend(this_grads)
-
-                    # if "bert.encoder.layer.0.moe_linear.gate.gate.weight" in name:
-                    #     # print(para.shape)
-                    #     current_gate = para.grad.view(-1).cpu()
-                    #     # print(f"layer_0_gate_weight: ", para)
-                    #     # print(f"Layer_0_gate_for_exp_{i}: ", current_gate)
-                    #     # print("current_gate_grads_exp_i: ", current_gate_grads_exp_i)
-                    #     gate_mean_gradients = current_gate.detach().abs().mean()
-                    #     # print(gate_mean_gradients)
-                    #     gate_grads_0.append(gate_mean_gradients)
-
-                # # 計算每個epoch後權重的變化
-                # weight_changes = {name: (p.data - initial_weights[name]).abs().sum().item() for name, p in model.named_parameters()}
-
-                # # 儲存或打印權重變化數據
-                # print(f'Epoch {epoch}:')
-                # for name, change in weight_changes.items():
-                #     print(f' - {name} weight change: {change}')
-
-
-
-                        # if "bert.encoder.layer.0.moe_linear.gate.gate.weight" in name:
-                        #     current_gate = para.grad.view(-1).cpu()
-                        #     print(f"layer_0_gate_weight: ", para)
-                        #     print(f"Layer_0_gate_for_exp_{i}: ", current_gate)
-                        #     current_gate_grads_exp_i = current_gate[i]
-                        #     print("current_gate_grads_exp_i: ", current_gate_grads_exp_i)
-                        #     gate_mean_gradients = current_gate_grads_exp_i.detach().abs().mean()
-                        #     print(f"gate_grads_for_exp_{i} : ", gate_mean_gradients)
-                        #     eval(gate_grads).append(gate_mean_gradients)
-
+                                    # print(f"expert_grads_L{i}_FFN1_nabs[{j}] : ", this_grads)
+                                    eval(f"expert_grads_L{i}_FFN1_nabs[{j}]").extend(this_grads)                  
                     
-
-                    # if "bert.encoder.layer.0.moe_linear.layer_norm.weight" in name:
-                    #     layer_grads = para.grad.view(-1).cpu()
-                    #     # print("Layer: ", para)
-                    #     layer_mean_gradients = layer_grads.detach().abs().mean()
-                    #     # print(f"Layer_grads : ", layer_mean_gradients)
-                    #     layer_grads_all.append(layer_mean_gradients)
-                # print("file_size: ", len(layer_grads_0))
-                        
-
-
                 count += 1
-
-                    # 读取最终权重
-                    # final_weight = final_gate_weights[i]
-                    
-                #     # 计算当前权重和最终权重的L2范数差异
-                #     current_diff = torch.norm(current_weight - final_weight).item()
-                #     # 归一化这个差异
-                #     normalized_diff = abs(current_diff) / abs(initial_final_diff[i])
-                #     normalized_diffs[i].append(normalized_diff)  # 将归一化差异添加到对应层的列表中
-
                 optimizer.zero_grad()
+                # torch.cuda.empty_cache()  # 清理缓存
                 elapsed_all += time.time() - batch_start
                 step += 1
-                if use_wandb is True and local_rank == 0:
-                    wandb.log({'batch_loss': loss_all/step})
+                # if use_wandb is True and local_rank == 0:
+                #     wandb.log({'batch_loss': loss_all/step})
                     # wandb.log({'batch_loss': loss_all})
                 throttling_costs += outputs.total_throttling_costs
                 comm_costs += outputs.total_comm_costs
-                if local_rank == 0:
-                    progress_bar.set_description('Epoch {} | Loss {:.2f} | acc {:.2f} | mean batch time {:.2f}, mean throttling time {:.2f}, mean comm time {:.2f}'.format(
-                                                epoch, (loss_all/step), best_acc, (elapsed_all/step)*1000, (throttling_costs/step)*1000, (comm_costs/step)*1000) )
-                    # loss_all_array.append(loss_all/step)
-                    progress_bar.update(1)
 
-                # # 指定要修改的目錄路徑
-                # directory_path = '/home/hagoo_file/MoE/examples/distributed'
-                # # 指定舊的後綴和新的後綴
-                # old_suffix = 'gate_count_layer_*.txt'
-                # new_suffix = 'gate_count_layer_*.txt'
-                # rename_files_in_directory(directory_path, old_suffix, new_suffix)
+                end_time = time.time() - start_time
+                print(f"Epoch {epoch} | Loss {loss_all/step:.2f} | acc {accuracy:.2f} | time {end_time:.2f} |")
 
-            # with open(f"layer_grads_all.txt", 'a') as file:
-            #         for item in layer_grads_all:
-            #             file.write(str(item) + '\n')
 
-            for i in range(8):
-                np.save(f"expert_grads_L0_FFN0_{i}_nabs.npy", expert_grads_L0_FFN0_nabs[i])
-                np.save(f"expert_grads_L0_FFN1_{i}_nabs.npy", expert_grads_L0_FFN1_nabs[i])
-                np.save(f"expert_grads_L1_FFN0_{i}_nabs.npy", expert_grads_L1_FFN0_nabs[i])
-                np.save(f"expert_grads_L1_FFN1_{i}_nabs.npy", expert_grads_L1_FFN1_nabs[i])
+                # print(f"Epoch {epoch} | Loss {loss_all/step:.2f} | acc {best_acc:.2f}")
 
-            # with open(f"loss_value.txt", 'a') as file:
-            #         for item in loss_all_array:
-            #             file.write(str(item) + '\n')
+                # if local_rank == 0:
+                #     progress_bar.set_description('Epoch {} | Loss {:.2f} | acc {:.2f} | mean batch time {:.2f}, mean throttling time {:.2f}, mean comm time {:.2f}'.format(
+                #                                 epoch, (loss_all/step), best_acc, (elapsed_all/step)*1000, (throttling_costs/step)*1000, (comm_costs/step)*1000) )
+                #     # loss_all_array.append(loss_all/step)
+                #     progress_bar.update(1)
 
-            
+            model.eval()
+            is_eval = True
+            # question_answerer = pipeline("question-answering", model=model)
+            start_logits = []
+            end_logits = []
+            # accelerator.print("Evaluation!")
+            for idx, batch in enumerate(eval_dataloader):
+                batch = {k: v.to(device) for k, v in batch.items()}
+                with torch.no_grad():
+                    outputs = model(**batch)
 
-            # with open("gate_grads_0.txt", 'a') as file:
-            #     for item in gate_grads_0:
-            #         file.write(str(item) + '\n')
+                start_logits.append(outputs.start_logits.cpu().numpy())
+                end_logits.append(outputs.end_logits.cpu().numpy())
+            start_logits = np.concatenate(start_logits)
+            end_logits = np.concatenate(end_logits)
+            start_logits = start_logits[: len(validation_dataset)]
+            end_logits = end_logits[: len(validation_dataset)]
+            # metrics = compute_metrics(start_logits, end_logits, validation_dataset, raw_datasets["validation"])
+            metrics = compute_metrics(start_logits, end_logits, eval_dataset, datasets["validation"])
+            accuracy = metrics['exact_match']
+            print("accuracy: ", accuracy)
+            acc.append(accuracy)
+            print(f"Epoch {epoch} | Loss {loss_all/step:.2f} | acc {accuracy:.2f} |=========================================")
+                # {'exact_match': 83.0, 'f1': 88.25}
+                # # if use_wandb is True and local_rank == 0:
+                #     # wandb.log({'loss': loss_all/step, 'exact_match':metrics['exact_match'],'f1':metrics['f1']}) # 'rouge1': result['rouge1']})
+                
+                # if local_rank == 0:
+                #     print(f'Eval | Loss: {loss_all/step:.6f} | Acc:{metrics["exact_match"]} | f1: {metrics["f1"]}')
+                
+                # if best_acc < metrics['f1']:
+                #     save_model(model,model_name)
+                #     best_acc = metrics['exact_match']
+
+                
+        np.save('losses.npy', losses)
+        np.save('acc.npy', acc)
+        for i in range(8):
+            np.save(f"expert_grads_L0_FFN0_{i}_nabs.npy", expert_grads_L0_FFN0_nabs[i])
+            np.save(f"expert_grads_L0_FFN1_{i}_nabs.npy", expert_grads_L0_FFN1_nabs[i])
+            np.save(f"expert_grads_L1_FFN0_{i}_nabs.npy", expert_grads_L1_FFN0_nabs[i])
+            np.save(f"expert_grads_L1_FFN1_{i}_nabs.npy", expert_grads_L1_FFN1_nabs[i])
+            # np.save(f"expert_grads_L2_FFN0_{i}_nabs.npy", expert_grads_L2_FFN0_nabs[i])
+            # np.save(f"expert_grads_L2_FFN1_{i}_nabs.npy", expert_grads_L2_FFN1_nabs[i])
+            # np.save(f"expert_grads_L3_FFN0_{i}_nabs.npy", expert_grads_L3_FFN0_nabs[i])
+            # np.save(f"expert_grads_L3_FFN1_{i}_nabs.npy", expert_grads_L3_FFN1_nabs[i])
             # dict_router = {}
             # index = 0
-                # if step % eval_interval == 0:
-                #     model.eval()
-                #     # question_answerer = pipeline("question-answering", model=model)
-                #     start_logits = []
-                #     end_logits = []
-                #     # accelerator.print("Evaluation!")
-                #     for idx, batch in enumerate(eval_dataloader):
-                #         batch = {k: v.to(device) for k, v in batch.items()}
-                #         with torch.no_grad():
-                #             outputs = model(**batch)
-
-                #         start_logits.append(outputs.start_logits.cpu().numpy())
-                #         end_logits.append(outputs.end_logits.cpu().numpy())
-                #     start_logits = np.concatenate(start_logits)
-                #     end_logits = np.concatenate(end_logits)
-                    # start_logits = start_logits[: len(validation_dataset)]
-                    # end_logits = end_logits[: len(validation_dataset)]
-                    # metrics = compute_metrics(start_logits, end_logits, validation_dataset, raw_datasets["validation"])
-                    # metrics = compute_metrics(start_logits, end_logits, eval_dataset, datasets["validation"])
-                    # {'exact_match': 83.0, 'f1': 88.25}
-                    # if use_wandb is True and local_rank == 0:
-                    #     wandb.log({'loss': loss_all/step, 'exact_match':metrics['exact_match'],'f1':metrics['f1']}) # 'rouge1': result['rouge1']})
-                    # if best_acc < metrics['f1']:
-                    #     save_model(model,model_name)
-                    #     best_acc = metrics['exact_match']
+            
     except KeyboardInterrupt:
-        if use_wandb is True and local_rank == 0:
-            wandb.finish()
+            # wandb.finish()
             logger('Exiting from training early')
-    if use_wandb is True and local_rank == 0:
-        wandb.finish()
+    # if use_wandb is True and local_rank == 0:
+    #     wandb.finish()
     del model
     del datasets
     del tokenizer#
