@@ -18,10 +18,12 @@ class NaiveGate(BaseGate):
     `Gate` module.
     """
 
-    def __init__(self, d_model, num_expert, world_size, top_k=2):
+    def __init__(self, d_model, num_expert, world_size, top_k=2, dropout_prob=0.5):
         super().__init__(num_expert, world_size)
         self.gate = nn.Linear(d_model, self.tot_expert)
         self.top_k = top_k
+        self.dropout = nn.Dropout(dropout_prob)
+
 
     def forward(self, inp, return_all_scores=False):
         r"""
@@ -29,6 +31,9 @@ class NaiveGate(BaseGate):
         output.
         """
         gate = self.gate(inp)
+
+        ###### Apply Dropout to Gate Values ######
+        gate = self.dropout(gate)  # Apply dropout to gate values
 
         ######  Design Dropout  ######
         #Property of Dropout => Pdrop = (exp_i / all_exp_grads_SUM)

@@ -67,7 +67,7 @@ parser.add_argument('--moe_world_size', type=int, default=1,
 args = parser.parse_args()
 assert args.moe_num_experts >= args.moe_top_k, "must have moe-num-expert >= moe-top_k"
 
-# set environment
+# # set environment
 # device = torch.device('cuda' if args.cuda else 'cpu')
 # device = torch.device('cuda:0')
 device = torch.device('cuda:1')
@@ -162,6 +162,7 @@ if local_rank == 0:
 
 
 model = model.to(device)
+# print(model)
 
 # training
 if args.model_name == 'bert':

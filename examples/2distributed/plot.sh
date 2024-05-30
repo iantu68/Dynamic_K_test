@@ -6,6 +6,13 @@ echo '=============================='
 echo 'Plot Gate Count ...'
 python gate_count_plot.py
 echo 'Done!'
+echo '=============================='
+echo 'Plot loss plot...'
+python loss_plot.py
+echo 'Done!'
+
+
+
 # echo '=============================='
 # echo 'Plot Gate Gradients Value...'
 # python gate_grads_plot.py

@@ -3,8 +3,8 @@ echo 'Run training on MoE-BERT...'
 python main.py \
     --model_name 'bert' \
     --train_batch_size 64\
-    --eval_batch_size 1 \
-    --num_epochs 1 \
+    --eval_batch_size 200 \
+    --num_epochs 100 \
     --cuda \
     --debug \
     --log_interval 10 \
