@@ -1,7 +1,7 @@
 #!/bin/bash
 
-total_epochs=3
-dir="TinyBERT_batch64_100Epochs_dropout_0.5"
+total_epochs=10
+dir="TinyBERT_batch64_100Epochs_Base"
 
 # 循环运行 run.sh 脚本
 for ((i=0; i<=$total_epochs; i++))

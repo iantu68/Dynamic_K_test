@@ -503,17 +503,17 @@ class CustomizedMoEPositionwiseFF(FMoETransformerMLP):
         self.layer_norm = nn.LayerNorm(d_model)
         self.dropout = nn.Dropout(dropout)
 
-    def forward(self, inp, layer_idx, training_step, batch_padding_mask):
+    def forward(self, inp, layer_idx, training_step, batch_padding_mask, last_elements_FFN0, last_elements_FFN1):
         if self.pre_lnorm:
             ##### layer normalization + positionwise feed-forward
-            core_out, fusion_costs, comm_time = super().forward(self.layer_norm(inp), layer_idx, training_step, False, batch_padding_mask)
+            core_out, fusion_costs, comm_time = super().forward(self.layer_norm(inp), layer_idx, training_step, False, batch_padding_mask, last_elements_FFN0, last_elements_FFN1)
             core_out = self.dropout(core_out)
 
             ##### residual connection
             output = core_out + inp
         else:
             ##### positionwise feed-forward
-            core_out, fusion_costs, comm_time = super().forward(inp, layer_idx, training_step, False,  batch_padding_mask)
+            core_out, fusion_costs, comm_time = super().forward(inp, layer_idx, training_step, False,  batch_padding_mask, last_elements_FFN0, last_elements_FFN1)
             core_out = self.dropout(core_out)
 
             ##### residual connection + layer normalization
@@ -557,6 +557,8 @@ class BertLayer(nn.Module):
         output_attentions: Optional[bool] = False,
         training_step: Optional[int] = None,
         batch_padding_mask: Optional[torch.Tensor] = None,
+        last_elements_FFN0: Optional[torch.Tensor] = None,
+        last_elements_FFN1: Optional[torch.Tensor] = None,
     ) -> Tuple[torch.Tensor]:
         # decoder uni-directional self-attention cached key/values tuple is at positions 1,2
         self_attn_past_key_value = past_key_value[:2] if past_key_value is not None else None
@@ -611,7 +613,7 @@ class BertLayer(nn.Module):
             outputs = (layer_output,) + outputs
         else:
             outputs_temp, throttling_costs, comm_costs = self.moe_linear(attention_output, self.layer_idx, training_step,
-                                                                         batch_padding_mask,)
+                                                                         batch_padding_mask,last_elements_FFN0, last_elements_FFN1)
             outputs = (outputs_temp,) + outputs
         # self.CustomizedMoEPositionwiseFF()
         # if decoder, return the attn key/values as the last output
@@ -647,6 +649,8 @@ class BertEncoder(nn.Module):
         return_dict: Optional[bool] = True,
         training_step: Optional[int] = None,
         batch_padding_mask: Optional[torch.Tensor] = None,
+        last_elements_FFN0: Optional[torch.Tensor] = None,
+        last_elements_FFN1: Optional[torch.Tensor] = None,
     ) -> Union[Tuple[torch.Tensor], BaseModelOutputWithPastAndCrossAttentions]:
         all_hidden_states = () if output_hidden_states else None
         all_self_attentions = () if output_attentions else None
@@ -697,6 +701,8 @@ class BertEncoder(nn.Module):
                     output_attentions,
                     training_step,
                     batch_padding_mask,
+                    last_elements_FFN0,
+                    last_elements_FFN1
                 )
             total_throttling_costs += throttling_costs
             total_comm_costs += comm_costs
@@ -1018,6 +1024,8 @@ class BertModel(BertPreTrainedModel):
         return_dict: Optional[bool] = None,
         training_step: Optional[int] = None,
         batch_padding_mask: Optional[torch.Tensor] = None,
+        last_elements_FFN0: Optional[torch.Tensor] = None,
+        last_elements_FFN1: Optional[torch.Tensor] = None
     ) -> Union[Tuple[torch.Tensor], BaseModelOutputWithPoolingAndCrossAttentions]:
         r"""
         encoder_hidden_states  (`torch.FloatTensor` of shape `(batch_size, sequence_length, hidden_size)`, *optional*):
@@ -1118,6 +1126,8 @@ class BertModel(BertPreTrainedModel):
             return_dict=return_dict,
             training_step=training_step,
             batch_padding_mask=batch_padding_mask,
+            last_elements_FFN0=last_elements_FFN0, 
+            last_elements_FFN1=last_elements_FFN1
         )
         sequence_output = encoder_outputs[0]
         pooled_output = self.pooler(sequence_output) if self.pooler is not None else None
@@ -1926,6 +1936,8 @@ class BertForQuestionAnswering(BertPreTrainedModel):
         return_dict: Optional[bool] = None,
         training_step: Optional[int] = None,
         batch_padding_mask: Optional[torch.Tensor] = None,
+        last_elements_FFN0: Optional[torch.Tensor] = None, 
+        last_elements_FFN1: Optional[torch.Tensor] = None, 
         #這邊加入需要資料
     ) -> Union[Tuple[torch.Tensor], QuestionAnsweringModelOutput]:
         r"""
@@ -1938,6 +1950,21 @@ class BertForQuestionAnswering(BertPreTrainedModel):
             Positions are clamped to the length of the sequence (`sequence_length`). Position outside of the sequence
             are not taken into account for computing the loss.
         """
+        # print("========================================================")
+        # print("BertForQuestionAnswering")
+        # if last_elements_FFN0 is not None and last_elements_FFN1 is not None:
+        #     print("last_elements_FFN0 = ", last_elements_FFN0)
+        #     print("last_elements_FFN1 = ", last_elements_FFN1)
+        #     print("Pass !!!")
+        # else:
+        #     print("FAIL !!!")
+        # print("========================================================")
+
+
+
+
+
+
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
         outputs = self.bert(
@@ -1952,7 +1979,10 @@ class BertForQuestionAnswering(BertPreTrainedModel):
             return_dict=return_dict,
             training_step=training_step,
             batch_padding_mask=batch_padding_mask,
+            last_elements_FFN0=last_elements_FFN0,
+            last_elements_FFN1=last_elements_FFN1,
         )
+
 
         sequence_output = outputs[0]
 

@@ -241,8 +241,7 @@ class FMoE(nn.Module):
         mark_module_parallel_comm(self.gate, "gate")
 
     def forward(self, moe_inp, original_shape, total_experts, top_k, layer_idx, fuse_token=False, training_step=0, batch_padding_mask: Optional[torch.Tensor] = None,
-                expert_grads_L0_FFN0_nabs : Optional[List] = None, expert_grads_L0_FFN1_nabs : Optional[List] = None, expert_grads_L1_FFN0_nabs : Optional[List] = None, 
-                expert_grads_L1_FFN1_nabs : Optional[List] = None, ):
+                last_elements_FFN0: Optional[torch.Tensor] = None, last_elements_FFN1: Optional[torch.Tensor] = None):
         r"""
         The FMoE module first computes gate output, and then conduct MoE forward
         according to the gate.  The score of the selected gate given by the
@@ -296,6 +295,11 @@ class FMoE(nn.Module):
         experts_counts = [0] * self.num_expert
         # print("********Layer.py**********")
         # print(batch_padding_mask)
+        if layer_idx == 0:
+            print("last_elements_FFN0 = ", last_elements_FFN0)
+        elif layer_idx == 1:
+            print("last_elements_FFN1 = ", last_elements_FFN1)
+
         if batch_padding_mask is not None:
             rebatch_padding_mask = batch_padding_mask.view(-1) 
 
@@ -320,12 +324,10 @@ class FMoE(nn.Module):
                 ]
 
 
-            output_file_counts = f"expert_counts_layer_{layer_idx}.txt"
-            # print("output_file_counts", output_file_counts)
-            with open(output_file_counts, 'w') as file_counts:
-                # 将专家计数结果追加到文件中
-                file_counts.write(f"experts_counts_layer_{layer_idx}={self.layer_experts_counts[layer_idx]}\n")
+            output_file_counts = f"expert_counts_layer_{layer_idx}.npy"
+            np.save(output_file_counts, np.array(self.layer_experts_counts[layer_idx]))
 
+            
         top_k_value = top_k
         throttling_costs = 0
         start_step =0

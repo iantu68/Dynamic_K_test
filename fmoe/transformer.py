@@ -61,7 +61,7 @@ class FMoETransformerMLP(FMoE):
         self.total_experts = num_expert * world_size
         self.top_k = kwargs.get('top_k')
 
-    def forward(self, inp: torch.Tensor, layer_idx = 0,  training_step=0, fuse_token=False, batch_padding_mask=None, ):
+    def forward(self, inp: torch.Tensor, layer_idx = 0,  training_step=0, fuse_token=False, batch_padding_mask=None, last_elements_FFN0=None, last_elements_FFN1=None):
                 # expert_grads_L0_FFN0_nabs=None, expert_grads_L0_FFN1_nabs=None,
                 # expert_grads_L1_FFN0_nabs=None, expert_grads_L1_FFN1_nabs=None):   #Optional[torch.Tensor] = None
         r"""
@@ -74,10 +74,7 @@ class FMoETransformerMLP(FMoE):
         inp = inp.reshape(-1, self.d_model)
         output, fusion_costs, comm_time, traffic_size = super().forward(inp, original_shape, self.total_experts, self.top_k, 
                                                                         layer_idx = layer_idx, fuse_token=fuse_token, training_step=training_step,
-                                                                        batch_padding_mask=batch_padding_mask, )
-                                                                        # expert_grads_L0_FFN0_nabs=expert_grads_L0_FFN0_nabs,
-                                                                        # expert_grads_L0_FFN1_nabs=expert_grads_L0_FFN1_nabs,
-                                                                        # expert_grads_L1_FFN0_nabs=expert_grads_L1_FFN0_nabs,
-                                                                        # expert_grads_L1_FFN1_nabs=expert_grads_L1_FFN1_nabs)
+                                                                        batch_padding_mask=batch_padding_mask,
+                                                                        last_elements_FFN0=last_elements_FFN0, last_elements_FFN1=last_elements_FFN1)
         # return output.reshape(original_shape), fusion_costs, comm_time, traffic_size
         return output.reshape(original_shape), fusion_costs, comm_time

@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # 載入檔案
-loss2 = np.load('losses.npy')
+training_loss = np.load('losses.npy')
 acc = np.load('acc.npy')
 frequency_0 = np.load('expert_counts_layer_0.npy')
 frequency_1 = np.load('expert_counts_layer_1.npy')
@@ -38,14 +38,13 @@ bin_centers = bin_edges[:-1]
 # 每个条形的宽度
 bar_width = 0.5
 
-
 # --------------------------------------------------------------------------------------------
 # Plot Experts Frequency
 plt.figure()
 plt.bar(bin_centers + bar_width, frequency_0, color='blue', width=bar_width, label='Layer 0')
 plt.xlabel('Expert Index')
-plt.ylabel('Counts')
-plt.title('Expert Counts by Layer')
+plt.ylabel('Times')
+plt.title('Expert Frequency')
 plt.xticks(bin_centers + bar_width / 2, range(len(frequency_0)))
 plt.legend(loc='upper right')
 plt.savefig('Expert_count_Layer0.png')
@@ -55,8 +54,8 @@ plt.show()
 plt.figure()
 plt.bar(bin_centers + bar_width, frequency_1, color='blue', width=bar_width, label='Layer 0')
 plt.xlabel('Expert Index')
-plt.ylabel('Counts')
-plt.title('Expert Counts by Layer')
+plt.ylabel('Times')
+plt.title('Expert Frequency')
 plt.xticks(bin_centers + bar_width / 2, range(len(frequency_1)))
 plt.legend(loc='upper right')
 plt.savefig('Expert_count_Layer1.png')
@@ -64,13 +63,13 @@ plt.show()
 
 # --------------------------------------------------------------------------------------------
 # Plot Loss
-loss2 = calculate_avg_steps(loss2)
+training_loss = calculate_avg_steps(training_loss)
 
 plt.figure()
-plt.plot(loss2, label='Train_loss', color='blue')
+plt.plot(training_loss, label='Train_loss', color='blue')
 plt.legend(loc='upper right')
 plt.title(f'Loss_Values_Curve')
-plt.xlabel('Epoch')
+plt.xlabel('Training Step')
 plt.ylabel('Loss Value')
 plt.savefig(f'Loss_Values_Curve.png')
 plt.show()
@@ -87,51 +86,64 @@ plt.axvline(x=max_acc_epoch, color='red', linewidth=0.8)
 plt.annotate(f'Max Accuracy: {max_acc:.4f} at Epoch {max_acc_epoch}', 
              xy=(max_acc_epoch, max_acc), 
              xytext=(max_acc_epoch, max_acc + 0.1))
-plt.legend(loc='upper right')
+plt.legend()
 plt.title(f'Accuracy_Curve')
 plt.xlabel('Epoch')
 plt.ylabel('Accuracy (%)')
 plt.savefig(f'Accuracy_Curve.png')
 plt.show()
 
-
-
+# --------------------------------------------------------------------------------------------
+# Plot Expert Grads
 # 读取数据文件
 for i in range(8):
-    values1 = np.load(f"expert_grads_L0_FFN0_{i}_nabs.npy", allow_pickle=True)
-    values2 = np.load(f"expert_grads_L0_FFN1_{i}_nabs.npy", allow_pickle=True)
-    values3 = np.load(f"expert_grads_L1_FFN0_{i}_nabs.npy", allow_pickle=True)
-    values4 = np.load(f"expert_grads_L1_FFN1_{i}_nabs.npy", allow_pickle=True)
+    values1 = np.load(f"expert_grads_FFN0_Linear0_{i}_nabs.npy", allow_pickle=True)
+    values2 = np.load(f"expert_grads_FFN0_Linear1_{i}_nabs.npy", allow_pickle=True)
+    values3 = np.load(f"expert_grads_FFN1_Linear0_{i}_nabs.npy", allow_pickle=True)
+    values4 = np.load(f"expert_grads_FFN1_Linear1_{i}_nabs.npy", allow_pickle=True)
     # values5 = np.load(f"expert_grads_L2_FFN0_{i}_nabs.npy", allow_pickle=True)
     # values6 = np.load(f"expert_grads_L2_FFN1_{i}_nabs.npy", allow_pickle=True)
     # values7 = np.load(f"expert_grads_L3_FFN0_{i}_nabs.npy", allow_pickle=True)
     # values8 = np.load(f"expert_grads_L3_FFN1_{i}_nabs.npy", allow_pickle=True)
+
+
+    # 对每个值进行平均步数计算
+    values1_avg = calculate_avg_steps(values1)
+    values2_avg = calculate_avg_steps(values2)
+    values3_avg = calculate_avg_steps(values3)
+    values4_avg = calculate_avg_steps(values4)
+
+    # 对每个值进行斜率計算
+    values1_avg_slopes = calculate_slopes(values1_avg)
+    values2_avg_slopes = calculate_slopes(values2_avg)
+    values3_avg_slopes = calculate_slopes(values3_avg)
+    values4_avg_slopes = calculate_slopes(values4_avg)
     
     plt.figure()
-    plt.plot(values1, label='L0_FFN0_na', color='red', linestyle='--')
-    plt.plot(values2, label='L0_FFN1_na', color='blue', linestyle='--')
+    plt.plot(values1_avg, label='L0_Liner0_na', color='red', linestyle='-')
+    plt.plot(values2_avg, label='L0_Liner1_na', color='blue', linestyle='-')
     plt.legend(loc='upper right')
-    plt.title(f'L1_grads_values')
-    plt.xlabel('Training Step')
+    plt.title(f'L0_grads_values')
+    plt.xlabel('Epoch')
     plt.ylabel('Gradients Value')
     plt.ylim()
     plt.savefig(f'L0_grads_values{i}.png')
     plt.show()
 
     plt.figure()
-    plt.plot(values3, label='L1_FFN0_na', color='red', linestyle='--')
-    plt.plot(values4, label='L1_FFN1_na', color='blue', linestyle='--')
+    plt.plot(values3_avg, label='L1_Liner0_na', color='red', linestyle='-')
+    plt.plot(values4_avg, label='L1_Liner1_na', color='blue', linestyle='-')
     plt.legend(loc='upper right')
     plt.title(f'L1_grads_values')
-    plt.xlabel('Training Step')
+    plt.xlabel('Epoch')
     plt.ylabel('Gradients Value')
     plt.ylim()
     plt.savefig(f'L1_grads_values{i}.png')
     plt.show()
 
     # plt.figure()
-    # plt.plot(values5, label='L2_FFN0_na', color='red', linestyle='--')
-    # plt.plot(values6, label='L2_FFN1_na', color='blue', linestyle='--')
+    # plt.plot(values5, label='L2_Liner0_na', color='red', linestyle='--')
+    # plt.plot(values6, label='L2_Liner1_na', color='blue', linestyle='--')
     # plt.legend(loc='upper right')
     # plt.title(f'L1_grads_values')
     # plt.xlabel('Training Step')
@@ -141,8 +153,8 @@ for i in range(8):
     # plt.show()
 
     # plt.figure()
-    # plt.plot(values7, label='L3_FFN0_na', color='red', linestyle='--')
-    # plt.plot(values8, label='L3_FFN1_na', color='blue', linestyle='--')
+    # plt.plot(values7, label='L3_Liner0_na', color='red', linestyle='--')
+    # plt.plot(values8, label='L3_Liner1_na', color='blue', linestyle='--')
     # plt.legend(loc='upper right')
     # plt.title(f'L1_grads_values')
     # plt.xlabel('Training Step')
@@ -150,4 +162,26 @@ for i in range(8):
     # plt.ylim()
     # plt.savefig(f'L3_grads_values{i}.png')
     # plt.show()
+    # --------------------------------------------------------------------------------------------
+    # # Plot all_slope
+    # plt.figure()
+    # plt.plot(values1_avg_slopes , label='L0_FFN0_na_slope', color='red')
+    # plt.plot(values2_avg_slopes , label='L0_FFN1_na_slope', color='blue')
+    # plt.title(f'L0_grads_Slopes')
+    # plt.xlabel('Epoch')
+    # plt.ylabel('Slope')
+    # plt.legend()
+    # plt.grid(True)
+    # plt.savefig(f'L0_grads_Slopes{i}.png')
+    # plt.show()
 
+    # plt.figure()
+    # plt.plot(values3_avg_slopes , label='L1_FFN0_na_slope', color='red')
+    # plt.plot(values4_avg_slopes , label='L1_FFN1_na_slope', color='blue')
+    # plt.title(f'L1_grads_Slopes')
+    # plt.xlabel('Epoch')
+    # plt.ylabel('Slope')
+    # plt.legend()
+    # plt.grid(True)
+    # plt.savefig(f'L1_grads_Slopes{i}.png')
+    # plt.show()
