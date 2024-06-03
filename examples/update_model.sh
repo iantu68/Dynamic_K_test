@@ -10,8 +10,8 @@
 # output
 
 # bert
-cp /home/anaconda3/envs/2fmoe/lib/python3.10/site-packages/transformers/models/bert/configuration_bert.py models/bert/
-cp /home/anaconda3/envs/2fmoe/lib/python3.10/site-packages/transformers/models/bert/modeling_bert.py models/bert/
+cp /home/anaconda3/envs/fmoe/lib/python3.10/site-packages/transformers/models/bert/configuration_bert.py models/bert/
+cp /home/anaconda3/envs/fmoe/lib/python3.10/site-packages/transformers/models/bert/modeling_bert.py models/bert/
 
 
 cp models/modeling_outputs.py /home/anaconda3/envs/2fmoe/lib/python3.10/site-packages/transformers/

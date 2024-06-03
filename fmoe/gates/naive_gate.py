@@ -38,11 +38,13 @@ class NaiveGate(BaseGate):
         # print("Gate= ", gate)
         # print("gate_probability = ", P_gate)
 
-        ######  Expert Dropout  ######
+        # ###### Apply Dropout to Gate Values(Normal Dropout) ######
         # gate = self.dropout(gate)  # Apply dropout to gate values
+
+        # ######  Expert Dropout  ######
         # gate = F.softmax(gate, dim=-1)
         
-        # ######  My Design Dropout  ######
+        ######  My Design Dropout  ######
         if P_gate is not None and len(P_gate) > 0:
             P_gate_tensor = torch.tensor(P_gate, dtype=gate.dtype, device=gate.device)
 

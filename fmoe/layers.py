@@ -244,7 +244,10 @@ class FMoE(nn.Module):
         mark_module_parallel_comm(self.gate, "gate")
 
     def forward(self, moe_inp, original_shape, total_experts, top_k, layer_idx, fuse_token=False, training_step=0, batch_padding_mask: Optional[torch.Tensor] = None,
-                last_elements_FFN0: Optional[torch.Tensor] = None, last_elements_FFN1: Optional[torch.Tensor] = None):
+                last_elements_FFN0: Optional[torch.Tensor] = None, last_elements_FFN1: Optional[torch.Tensor] = None, 
+                last_elements_FFN2: Optional[torch.Tensor] = None, last_elements_FFN3: Optional[torch.Tensor] = None,
+                last_elements_FFN4: Optional[torch.Tensor] = None, last_elements_FFN5: Optional[torch.Tensor] = None,
+                last_elements_FFN6: Optional[torch.Tensor] = None, last_elements_FFN7: Optional[torch.Tensor] = None,):
         r"""
         The FMoE module first computes gate output, and then conduct MoE forward
         according to the gate.  The score of the selected gate given by the
@@ -281,6 +284,25 @@ class FMoE(nn.Module):
         elif layer_idx == 1:
             # print("last_elements_FFN1 = ", last_elements_FFN1)
             P_gate = last_elements_FFN1
+        elif layer_idx == 2:
+            # print("last_elements_FFN1 = ", last_elements_FFN1)
+            P_gate = last_elements_FFN2
+        elif layer_idx == 3:
+            # print("last_elements_FFN1 = ", last_elements_FFN1)
+            P_gate = last_elements_FFN3
+        elif layer_idx == 4:
+            # print("last_elements_FFN1 = ", last_elements_FFN1)
+            P_gate = last_elements_FFN4
+        elif layer_idx == 5:
+            # print("last_elements_FFN1 = ", last_elements_FFN1)
+            P_gate = last_elements_FFN5
+        elif layer_idx == 6:
+            # print("last_elements_FFN1 = ", last_elements_FFN1)
+            P_gate = last_elements_FFN6
+        elif layer_idx == 7:
+            # print("last_elements_FFN1 = ", last_elements_FFN1)
+            P_gate = last_elements_FFN7
+            
 
         #gate_top_k_idx ==> 被選中的expert 是編號幾
         #gate_score ==> 被選中的expert 分數是多少
