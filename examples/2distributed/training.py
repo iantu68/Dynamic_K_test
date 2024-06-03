@@ -367,11 +367,11 @@ def train_Bert_MoE(**kwargs):
                             # avg_grads = weighted_average(eval(f"expert_grads_FFN{i}_Linear0_nabs[{j}]"), eval(f"expert_grads_FFN{i}_Linear1_nabs[{j}]"))   
                                 # print("grads1 : ", this_grads1)
                                 avg_grads = (this_grads1 + this_grads2) * 0.5
-                                print(f"FFN{i}_grads_avg_[{j}] = ", avg_grads)
+                                # print(f"FFN{i}_grads_avg_[{j}] = ", avg_lsgrads)
                                 if isinstance(avg_grads, np.ndarray) or isinstance(avg_grads, torch.Tensor):
                                     avg_grads_value = avg_grads.item()  # 提取标量值
                                 else:
-                                    print("This is Value")
+                                    # print("This is Value")
                                     avg_grads_value = avg_grads  # 如果已经是标量，直接赋值
                                 eval(f"expert_grads_FFN{i}_Avg[{j}]").append(avg_grads_value)
                                 this_grads1 = None

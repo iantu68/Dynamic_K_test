@@ -613,7 +613,7 @@ class BertLayer(nn.Module):
             outputs = (layer_output,) + outputs
         else:
             outputs_temp, throttling_costs, comm_costs = self.moe_linear(attention_output, self.layer_idx, training_step,
-                                                                         batch_padding_mask,last_elements_FFN0, last_elements_FFN1)
+                                                                         batch_padding_mask, last_elements_FFN0, last_elements_FFN1)
             outputs = (outputs_temp,) + outputs
         # self.CustomizedMoEPositionwiseFF()
         # if decoder, return the attn key/values as the last output

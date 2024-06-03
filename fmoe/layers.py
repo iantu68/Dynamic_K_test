@@ -199,6 +199,9 @@ class FMoE(nn.Module):
         self.global_expert_counts = {}
         self.layer_experts_counts = {}
 
+        # gate_probabilaity
+        P_gate = None
+
     def expert_fn(self, inp, fwd_expert_count):
         r"""
         The default expert function which either calls the experts as a whole
@@ -271,9 +274,17 @@ class FMoE(nn.Module):
 
             moe_inp = tree.map_structure(slice_func, moe_inp)
 
+        # ------------------------------------------------------------------------------------------------
+        if layer_idx == 0:
+            # print("last_elements_FFN0 = ", last_elements_FFN0)
+            P_gate = last_elements_FFN0
+        elif layer_idx == 1:
+            # print("last_elements_FFN1 = ", last_elements_FFN1)
+            P_gate = last_elements_FFN1
+
         #gate_top_k_idx ==> 被選中的expert 是編號幾
         #gate_score ==> 被選中的expert 分數是多少
-        gate_top_k_idx, gate_score = self.gate(moe_inp)
+        gate_top_k_idx, gate_score = self.gate(moe_inp, P_gate)
         # print(self.gate,gate_top_k_idx, gate_score)
         
         if self.gate_hook is not None:
@@ -291,14 +302,10 @@ class FMoE(nn.Module):
             moe_inp = tree.map_structure(delete_mask_func, moe_inp)
             gate_top_k_idx = gate_top_k_idx[mask == 0, :]
 
-
+        
         experts_counts = [0] * self.num_expert
         # print("********Layer.py**********")
         # print(batch_padding_mask)
-        if layer_idx == 0:
-            print("last_elements_FFN0 = ", last_elements_FFN0)
-        elif layer_idx == 1:
-            print("last_elements_FFN1 = ", last_elements_FFN1)
 
         if batch_padding_mask is not None:
             rebatch_padding_mask = batch_padding_mask.view(-1) 
@@ -326,8 +333,8 @@ class FMoE(nn.Module):
 
             output_file_counts = f"expert_counts_layer_{layer_idx}.npy"
             np.save(output_file_counts, np.array(self.layer_experts_counts[layer_idx]))
-
-            
+        
+        
         top_k_value = top_k
         throttling_costs = 0
         start_step =0
