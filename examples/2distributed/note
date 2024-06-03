@@ -1,10 +1,2 @@
-TinyBERT_batch64_100Epochs_dropout_0.5
-TinyBERT_batch64_100Epochs_Base
-TinyBERT_batch64_100Epochs_Mydropout
- TinyBERT_batch64_100Epochs_Expert_dropout_0.5
-TinyBERT_batch64_100Epochs_Base
-My_method
-TinyBERT_batch64_100Epochs_Expert_dropout_0.5
-My_method + softmax
-TinyBERT_batch64_100Epochs_Expert_dropout_0.5
-TinyBERT_batch64_100Epochs_Expert_dropout_0.5
+New
+My_idea

@@ -38,33 +38,31 @@ class NaiveGate(BaseGate):
         # print("Gate= ", gate)
         # print("gate_probability = ", P_gate)
 
-        ###### Apply Dropout to Gate Values(Normal Dropout) ######
-        gate = self.dropout(gate)  # Apply dropout to gate values
-
         ######  Expert Dropout  ######
-        gate = F.softmax(gate, dim=-1)
+        # gate = self.dropout(gate)  # Apply dropout to gate values
+        # gate = F.softmax(gate, dim=-1)
         
         # ######  My Design Dropout  ######
-        # if P_gate is not None and len(P_gate) > 0:
-        #     P_gate_tensor = torch.tensor(P_gate, dtype=gate.dtype, device=gate.device)
+        if P_gate is not None and len(P_gate) > 0:
+            P_gate_tensor = torch.tensor(P_gate, dtype=gate.dtype, device=gate.device)
 
-        #     # 确保 P_gate_tensor 是二维张量
-        #     if P_gate_tensor.dim() == 1:
-        #         P_gate_tensor = P_gate_tensor.unsqueeze(0)
+            # 确保 P_gate_tensor 是二维张量
+            if P_gate_tensor.dim() == 1:
+                P_gate_tensor = P_gate_tensor.unsqueeze(0)
 
-        #     # 对 P_gate_tensor 应用 softmax
-        #     P_gate_tensor = F.softmax(P_gate_tensor, dim=1)
+            # 对 P_gate_tensor 应用 softmax
+            P_gate_tensor = F.softmax(P_gate_tensor, dim=1)
 
-        #     # zero_mask = P_gate_tensor == 0
-        #     # P_gate_tensor[zero_mask] = 1e-8
+            # zero_mask = P_gate_tensor == 0
+            # P_gate_tensor[zero_mask] = 1e-8
 
-        #     Router_probability = 1 / (1 * P_gate_tensor)
-        #     Router_probability = Router_probability.expand_as(gate)
-        #     # print("Router_probability = ", Router_probability)
-        #     gate = gate * Router_probability
-        #     # print("Gate= ", gate)
-        # else:
-        #     print("P_gate is None or empty. Skipping calculation.")
+            Router_probability = 1 / (1 * P_gate_tensor)
+            Router_probability = Router_probability.expand_as(gate)
+            # print("Router_probability = ", Router_probability)
+            gate = gate * Router_probability
+            # print("Gate= ", gate)
+        else:
+            print("P_gate is None or empty. Skipping calculation.")
         
 
         gate_top_k_val, gate_top_k_idx = torch.topk(

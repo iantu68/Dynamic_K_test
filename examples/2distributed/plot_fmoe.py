@@ -114,10 +114,10 @@ for i in range(8):
     values4_avg = calculate_avg_steps(values4)
 
     # 对每个值进行斜率計算
-    values1_avg_slopes = calculate_slopes(values1_avg)
-    values2_avg_slopes = calculate_slopes(values2_avg)
-    values3_avg_slopes = calculate_slopes(values3_avg)
-    values4_avg_slopes = calculate_slopes(values4_avg)
+    # values1_avg_slopes = calculate_slopes(values1_avg)
+    # values2_avg_slopes = calculate_slopes(values2_avg)
+    # values3_avg_slopes = calculate_slopes(values3_avg)
+    # values4_avg_slopes = calculate_slopes(values4_avg)
     
     # plt.figure()
     # plt.plot(values1_avg, label='L0_Liner0_na', color='red', linestyle='-')
