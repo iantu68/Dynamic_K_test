@@ -352,9 +352,9 @@ def train_Bert_MoE(**kwargs):
                 # print("="*10 + "Training.py" + "="*10)
                 outputs = model(**batch, training_step = step, batch_padding_mask = batch_padding_mask,
                                 last_elements_FFN0 = last_elements_FFN0, last_elements_FFN1 = last_elements_FFN1,
-                                last_elements_FFN2 = last_elements_FFN2, last_elements_FFN3 = last_elements_FFN3,
-                                last_elements_FFN4 = last_elements_FFN4, last_elements_FFN5 = last_elements_FFN5,
-                                last_elements_FFN6 = last_elements_FFN6, last_elements_FFN7 = last_elements_FFN7,)
+                                last_elements_FFN2 = last_elements_FFN2, last_elements_FFN3 = last_elements_FFN3,)
+                                # last_elements_FFN4 = last_elements_FFN4, last_elements_FFN5 = last_elements_FFN5,
+                                # last_elements_FFN6 = last_elements_FFN6, last_elements_FFN7 = last_elements_FFN7,)
                 loss = outputs.loss
                 loss.backward()
                 loss_all += loss.item()
@@ -367,7 +367,7 @@ def train_Bert_MoE(**kwargs):
                 print ("===============catch===============")
                 #Single Expert gradient output
                 for name, para in model.named_parameters():
-                    for i in range(8):
+                    for i in range(4):
                         for j in range(8):
                             # this_grads1 = None
                             # this_grads2 = None
@@ -466,10 +466,10 @@ def train_Bert_MoE(**kwargs):
             np.save(f"FFN1_grads_Avg_{i}.npy", expert_grads_FFN1_Avg[i])
             np.save(f"FFN2_grads_Avg_{i}.npy", expert_grads_FFN2_Avg[i])
             np.save(f"FFN3_grads_Avg_{i}.npy", expert_grads_FFN3_Avg[i])
-            np.save(f"FFN4_grads_Avg_{i}.npy", expert_grads_FFN4_Avg[i])
-            np.save(f"FFN5_grads_Avg_{i}.npy", expert_grads_FFN5_Avg[i])
-            np.save(f"FFN6_grads_Avg_{i}.npy", expert_grads_FFN6_Avg[i])
-            np.save(f"FFN7_grads_Avg_{i}.npy", expert_grads_FFN7_Avg[i])
+            # np.save(f"FFN4_grads_Avg_{i}.npy", expert_grads_FFN4_Avg[i])
+            # np.save(f"FFN5_grads_Avg_{i}.npy", expert_grads_FFN5_Avg[i])
+            # np.save(f"FFN6_grads_Avg_{i}.npy", expert_grads_FFN6_Avg[i])
+            # np.save(f"FFN7_grads_Avg_{i}.npy", expert_grads_FFN7_Avg[i])
 
             np.save(f"expert_grads_FFN0_Linear0_{i}_nabs.npy", expert_grads_FFN0_Linear0_nabs[i])
             np.save(f"expert_grads_FFN0_Linear1_{i}_nabs.npy", expert_grads_FFN0_Linear1_nabs[i])
@@ -479,14 +479,14 @@ def train_Bert_MoE(**kwargs):
             np.save(f"expert_grads_FFN2_Linear1_{i}_nabs.npy", expert_grads_FFN2_Linear1_nabs[i])
             np.save(f"expert_grads_FFN3_Linear0_{i}_nabs.npy", expert_grads_FFN3_Linear0_nabs[i])
             np.save(f"expert_grads_FFN3_Linear1_{i}_nabs.npy", expert_grads_FFN3_Linear1_nabs[i])
-            np.save(f"expert_grads_FFN4_Linear0_{i}_nabs.npy", expert_grads_FFN4_Linear0_nabs[i])
-            np.save(f"expert_grads_FFN4_Linear1_{i}_nabs.npy", expert_grads_FFN4_Linear1_nabs[i])
-            np.save(f"expert_grads_FFN5_Linear0_{i}_nabs.npy", expert_grads_FFN5_Linear0_nabs[i])
-            np.save(f"expert_grads_FFN5_Linear1_{i}_nabs.npy", expert_grads_FFN5_Linear1_nabs[i])
-            np.save(f"expert_grads_FFN6_Linear0_{i}_nabs.npy", expert_grads_FFN6_Linear0_nabs[i])
-            np.save(f"expert_grads_FFN6_Linear1_{i}_nabs.npy", expert_grads_FFN6_Linear1_nabs[i])
-            np.save(f"expert_grads_FFN7_Linear0_{i}_nabs.npy", expert_grads_FFN7_Linear0_nabs[i])
-            np.save(f"expert_grads_FFN7_Linear1_{i}_nabs.npy", expert_grads_FFN7_Linear1_nabs[i])
+            # np.save(f"expert_grads_FFN4_Linear0_{i}_nabs.npy", expert_grads_FFN4_Linear0_nabs[i])
+            # np.save(f"expert_grads_FFN4_Linear1_{i}_nabs.npy", expert_grads_FFN4_Linear1_nabs[i])
+            # np.save(f"expert_grads_FFN5_Linear0_{i}_nabs.npy", expert_grads_FFN5_Linear0_nabs[i])
+            # np.save(f"expert_grads_FFN5_Linear1_{i}_nabs.npy", expert_grads_FFN5_Linear1_nabs[i])
+            # np.save(f"expert_grads_FFN6_Linear0_{i}_nabs.npy", expert_grads_FFN6_Linear0_nabs[i])
+            # np.save(f"expert_grads_FFN6_Linear1_{i}_nabs.npy", expert_grads_FFN6_Linear1_nabs[i])
+            # np.save(f"expert_grads_FFN7_Linear0_{i}_nabs.npy", expert_grads_FFN7_Linear0_nabs[i])
+            # np.save(f"expert_grads_FFN7_Linear1_{i}_nabs.npy", expert_grads_FFN7_Linear1_nabs[i])
             # np.save(f"expert_grads_L2_Linear0_{i}_nabs.npy", expert_grads_L2_Linear0_nabs[i])
             # np.save(f"expert_grads_L2_Linear1_{i}_nabs.npy", expert_grads_L2_Linear1_nabs[i])
             # np.save(f"expert_grads_L3_Linear0_{i}_nabs.npy", expert_grads_L3_Linear0_nabs[i])
