@@ -1,10 +1,10 @@
 #!/bin/bash
 
-total_epochs=7
-dir="Small_Myidea_30epoch"
+total_epochs=2
+dir="Tiny_Myidea_with_softmax"
 
 # 循环运行 run.sh 脚本
-for ((i=2; i<=$total_epochs; i++))
+for ((i=0; i<=$total_epochs; i++))
 do
     echo "======================================"
     echo "Running training for epoch $i..."

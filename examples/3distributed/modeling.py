@@ -33,20 +33,20 @@ def Create_MoE_Model(**kwargs):
     # bert
     if kwargs['model_name'] == 'bert':
         from transformers import BertForQuestionAnswering
-        tokenizer = AutoTokenizer.from_pretrained("prajjwal1/bert-small")
-        config = AutoConfig.from_pretrained("prajjwal1/bert-small")
-        config_load = AutoConfig.from_pretrained("prajjwal1/bert-small")
+        tokenizer = AutoTokenizer.from_pretrained("prajjwal1/bert-tiny")
+        config = AutoConfig.from_pretrained("prajjwal1/bert-tiny")
+        config_load = AutoConfig.from_pretrained("prajjwal1/bert-tiny")
         config.moe = kwargs['moe']
         config.moe_num_experts = kwargs['moe_num_experts']
         config.moe_top_k = kwargs['moe_top_k']
         config.moe_group = kwargs['moe_group']
         config.moe_world_size = kwargs['moe_world_size']
 
-        modelForLoad = BertForQuestionAnswering.from_pretrained("prajjwal1/bert-small", config=config_load)
+        modelForLoad = BertForQuestionAnswering.from_pretrained("prajjwal1/bert-tiny", config=config_load)
         if config.moe_num_experts == 0:
             return modelForLoad,tokenizer
 
-        mymoe = BertForQuestionAnswering.from_pretrained("prajjwal1/bert-small", config=config)
+        mymoe = BertForQuestionAnswering.from_pretrained("prajjwal1/bert-tiny", config=config)
         # print(modelForLoad.state_dict().keys(),mymoe.state_dict().keys())
         mymoeParam = mymoe.state_dict()
         bertParam = modelForLoad.state_dict()

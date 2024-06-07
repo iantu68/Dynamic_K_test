@@ -4,7 +4,7 @@ python main.py \
     --model_name 'bert' \
     --train_batch_size 32\
     --eval_batch_size 200 \
-    --num_epochs 30 \
+    --num_epochs 1\
     --cuda \
     --debug \
     --log_interval 10 \
