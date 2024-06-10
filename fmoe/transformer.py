@@ -63,7 +63,7 @@ class FMoETransformerMLP(FMoE):
 
     def forward(self, inp: torch.Tensor, layer_idx = 0,  training_step=0, fuse_token=False, batch_padding_mask=None, 
                 last_elements_FFN0=None, last_elements_FFN1=None, last_elements_FFN2=None, last_elements_FFN3=None,
-                last_elements_FFN4=None, last_elements_FFN5=None,last_elements_FFN6=None, last_elements_FFN7=None,):
+                last_elements_FFN4=None, last_elements_FFN5=None,last_elements_FFN6=None, last_elements_FFN7=None, ema_comparison_masks=None):
                 # expert_grads_L0_FFN0_nabs=None, expert_grads_L0_FFN1_nabs=None,
                 # expert_grads_L1_FFN0_nabs=None, expert_grads_L1_FFN1_nabs=None):   #Optional[torch.Tensor] = None
         r"""
@@ -80,6 +80,7 @@ class FMoETransformerMLP(FMoE):
                                                                         last_elements_FFN0=last_elements_FFN0, last_elements_FFN1=last_elements_FFN1,
                                                                         last_elements_FFN2=last_elements_FFN2, last_elements_FFN3=last_elements_FFN3,
                                                                         last_elements_FFN4=last_elements_FFN4, last_elements_FFN5=last_elements_FFN5,
-                                                                        last_elements_FFN6=last_elements_FFN6, last_elements_FFN7=last_elements_FFN7)
+                                                                        last_elements_FFN6=last_elements_FFN6, last_elements_FFN7=last_elements_FFN7,
+                                                                        ema_comparison_masks=ema_comparison_masks)
         # return output.reshape(original_shape), fusion_costs, comm_time, traffic_size
         return output.reshape(original_shape), fusion_costs, comm_time

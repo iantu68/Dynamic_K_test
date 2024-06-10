@@ -504,12 +504,12 @@ class CustomizedMoEPositionwiseFF(FMoETransformerMLP):
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, inp, layer_idx, training_step, batch_padding_mask, last_elements_FFN0, last_elements_FFN1
-                , last_elements_FFN2, last_elements_FFN3, last_elements_FFN4, last_elements_FFN5, last_elements_FFN6, last_elements_FFN7):
+                , last_elements_FFN2, last_elements_FFN3, last_elements_FFN4, last_elements_FFN5, last_elements_FFN6, last_elements_FFN7, ema_comparison_masks):
         if self.pre_lnorm:
             ##### layer normalization + positionwise feed-forward
             core_out, fusion_costs, comm_time = super().forward(self.layer_norm(inp), layer_idx, training_step, False, batch_padding_mask, 
                                                                 last_elements_FFN0, last_elements_FFN1, last_elements_FFN2, last_elements_FFN3,
-                                                                last_elements_FFN4, last_elements_FFN5, last_elements_FFN6, last_elements_FFN7)
+                                                                last_elements_FFN4, last_elements_FFN5, last_elements_FFN6, last_elements_FFN7, ema_comparison_masks)
             core_out = self.dropout(core_out)
 
             ##### residual connection
@@ -518,7 +518,7 @@ class CustomizedMoEPositionwiseFF(FMoETransformerMLP):
             ##### positionwise feed-forward
             core_out, fusion_costs, comm_time = super().forward(inp, layer_idx, training_step, False,  batch_padding_mask,
                                                                 last_elements_FFN0, last_elements_FFN1, last_elements_FFN2, last_elements_FFN3,
-                                                                last_elements_FFN4, last_elements_FFN5, last_elements_FFN6, last_elements_FFN7)
+                                                                last_elements_FFN4, last_elements_FFN5, last_elements_FFN6, last_elements_FFN7, ema_comparison_masks)
             core_out = self.dropout(core_out)
 
             ##### residual connection + layer normalization
@@ -570,6 +570,7 @@ class BertLayer(nn.Module):
         last_elements_FFN5: Optional[torch.Tensor] = None,
         last_elements_FFN6: Optional[torch.Tensor] = None,
         last_elements_FFN7: Optional[torch.Tensor] = None,
+        ema_comparison_masks: Optional[torch.Tensor] = None,
     ) -> Tuple[torch.Tensor]:
         # decoder uni-directional self-attention cached key/values tuple is at positions 1,2
         self_attn_past_key_value = past_key_value[:2] if past_key_value is not None else None
@@ -626,7 +627,7 @@ class BertLayer(nn.Module):
             outputs_temp, throttling_costs, comm_costs = self.moe_linear(attention_output, self.layer_idx, training_step,
                                                                          batch_padding_mask, last_elements_FFN0, last_elements_FFN1,
                                                                          last_elements_FFN2, last_elements_FFN3, last_elements_FFN4, last_elements_FFN5,
-                                                                         last_elements_FFN6, last_elements_FFN7,)
+                                                                         last_elements_FFN6, last_elements_FFN7, ema_comparison_masks)
             outputs = (outputs_temp,) + outputs
         # self.CustomizedMoEPositionwiseFF()
         # if decoder, return the attn key/values as the last output
@@ -670,6 +671,7 @@ class BertEncoder(nn.Module):
         last_elements_FFN5: Optional[torch.Tensor] = None,
         last_elements_FFN6: Optional[torch.Tensor] = None,
         last_elements_FFN7: Optional[torch.Tensor] = None,
+        ema_comparison_masks: Optional[torch.Tensor] = None,
         
     ) -> Union[Tuple[torch.Tensor], BaseModelOutputWithPastAndCrossAttentions]:
         all_hidden_states = () if output_hidden_states else None
@@ -729,6 +731,7 @@ class BertEncoder(nn.Module):
                     last_elements_FFN5,
                     last_elements_FFN6,
                     last_elements_FFN7,
+                    ema_comparison_masks,
                 )
             total_throttling_costs += throttling_costs
             total_comm_costs += comm_costs
@@ -1058,6 +1061,7 @@ class BertModel(BertPreTrainedModel):
         last_elements_FFN5: Optional[torch.Tensor] = None,
         last_elements_FFN6: Optional[torch.Tensor] = None,
         last_elements_FFN7: Optional[torch.Tensor] = None,
+        ema_comparison_masks: Optional[torch.Tensor] = None,
     ) -> Union[Tuple[torch.Tensor], BaseModelOutputWithPoolingAndCrossAttentions]:
         r"""
         encoder_hidden_states  (`torch.FloatTensor` of shape `(batch_size, sequence_length, hidden_size)`, *optional*):
@@ -1166,6 +1170,7 @@ class BertModel(BertPreTrainedModel):
             last_elements_FFN5=last_elements_FFN5,
             last_elements_FFN6=last_elements_FFN6, 
             last_elements_FFN7=last_elements_FFN7,
+            ema_comparison_masks=ema_comparison_masks,
         )
         sequence_output = encoder_outputs[0]
         pooled_output = self.pooler(sequence_output) if self.pooler is not None else None
@@ -1982,6 +1987,7 @@ class BertForQuestionAnswering(BertPreTrainedModel):
         last_elements_FFN5: Optional[torch.Tensor] = None, 
         last_elements_FFN6: Optional[torch.Tensor] = None, 
         last_elements_FFN7: Optional[torch.Tensor] = None, 
+        ema_comparison_masks: Optional[torch.Tensor] = None
         #這邊加入需要資料
     ) -> Union[Tuple[torch.Tensor], QuestionAnsweringModelOutput]:
         r"""
@@ -1996,18 +2002,12 @@ class BertForQuestionAnswering(BertPreTrainedModel):
         """
         # print("========================================================")
         # print("BertForQuestionAnswering")
-        # if last_elements_FFN0 is not None and last_elements_FFN1 is not None:
-        #     print("last_elements_FFN0 = ", last_elements_FFN0)
-        #     print("last_elements_FFN1 = ", last_elements_FFN1)
+        # if ema_comparison_masks is not None:
+        #     print("last_elements_FFN0 = ", ema_comparison_masks)
         #     print("Pass !!!")
         # else:
         #     print("FAIL !!!")
         # print("========================================================")
-
-
-
-
-
 
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
@@ -2031,6 +2031,7 @@ class BertForQuestionAnswering(BertPreTrainedModel):
             last_elements_FFN5=last_elements_FFN5,
             last_elements_FFN6=last_elements_FFN6,
             last_elements_FFN7=last_elements_FFN7,
+            ema_comparison_masks=ema_comparison_masks
         )
 
 

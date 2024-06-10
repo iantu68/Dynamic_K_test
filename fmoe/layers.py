@@ -200,7 +200,18 @@ class FMoE(nn.Module):
         self.layer_experts_counts = {}
 
         # gate_probabilaity
-        P_gate = None
+        self.P_gate = None
+        self.stop_masks = [[1] * 8 for _ in range(2)]
+
+        self.layer_experts_counts_0 = [0] * self.num_expert
+        self.layer_experts_counts_1 = [0] * self.num_expert
+        self.layer_experts_counts_2 = [0] * self.num_expert
+        self.layer_experts_counts_3 = [0] * self.num_expert
+        self.layer_experts_counts_4 = [0] * self.num_expert
+        self.layer_experts_counts_5 = [0] * self.num_expert
+        self.layer_experts_counts_6 = [0] * self.num_expert
+        self.layer_experts_counts_7 = [0] * self.num_expert
+
 
     def expert_fn(self, inp, fwd_expert_count):
         r"""
@@ -247,12 +258,15 @@ class FMoE(nn.Module):
                 last_elements_FFN0: Optional[torch.Tensor] = None, last_elements_FFN1: Optional[torch.Tensor] = None, 
                 last_elements_FFN2: Optional[torch.Tensor] = None, last_elements_FFN3: Optional[torch.Tensor] = None,
                 last_elements_FFN4: Optional[torch.Tensor] = None, last_elements_FFN5: Optional[torch.Tensor] = None,
-                last_elements_FFN6: Optional[torch.Tensor] = None, last_elements_FFN7: Optional[torch.Tensor] = None,):
+                last_elements_FFN6: Optional[torch.Tensor] = None, last_elements_FFN7: Optional[torch.Tensor] = None,
+                ema_comparison_masks: Optional[torch.Tensor] = None):
         r"""
         The FMoE module first computes gate output, and then conduct MoE forward
         according to the gate.  The score of the selected gate given by the
         expert is multiplied to the experts' output tensors as a weight.
         """
+
+        # print("ema_comparison_masks = ", ema_comparison_masks)
 
         #找尋方法將expert_grads_L0_FFN0_nabs  輸入到gate 進行判斷。
         moe_inp_batch_size = tree.flatten(
@@ -280,33 +294,67 @@ class FMoE(nn.Module):
         # ------------------------------------------------------------------------------------------------
         if layer_idx == 0:
             # print("last_elements_FFN0 = ", last_elements_FFN0)
-            P_gate = last_elements_FFN0
+            self.P_gate = last_elements_FFN0
         elif layer_idx == 1:
             # print("last_elements_FFN1 = ", last_elements_FFN1)
-            P_gate = last_elements_FFN1
+            self.P_gate = last_elements_FFN1
         elif layer_idx == 2:
             # print("last_elements_FFN1 = ", last_elements_FFN1)
-            P_gate = last_elements_FFN2
+            self.P_gate = last_elements_FFN2
         elif layer_idx == 3:
             # print("last_elements_FFN1 = ", last_elements_FFN1)
-            P_gate = last_elements_FFN3
+            self.P_gate = last_elements_FFN3
         elif layer_idx == 4:
             # print("last_elements_FFN1 = ", last_elements_FFN1)
-            P_gate = last_elements_FFN4
+            self.P_gate = last_elements_FFN4
         elif layer_idx == 5:
             # print("last_elements_FFN1 = ", last_elements_FFN1)
-            P_gate = last_elements_FFN5
+            self.P_gate = last_elements_FFN5
         elif layer_idx == 6:
             # print("last_elements_FFN1 = ", last_elements_FFN1)
-            P_gate = last_elements_FFN6
+            self.P_gate = last_elements_FFN6
         elif layer_idx == 7:
             # print("last_elements_FFN1 = ", last_elements_FFN1)
-            P_gate = last_elements_FFN7
-            
+            self.P_gate = last_elements_FFN7
+        # # 如果在训练模式下，并且ema_comparison_masks存在和有效，则进行计算
+        # if ema_comparison_masks is not None:
+        #     print("Here")
+        #     # 使用累计的激活次数进行判断
+        #     expert_counts_attr = f'layer_experts_counts_{layer_idx}'
+        #     # 检查是否具有 expert_counts_attr 属性
+        #     if hasattr(self, expert_counts_attr):
+        #         # print(f"Object has attribute {expert_counts_attr}")
+        #         expert_counts = getattr(self, expert_counts_attr)
+        #         print(f"expert_counts: {expert_counts}")
 
+        #         # 检查 expert_counts 是否为空
+        #         if len(expert_counts) > 0 and all(isinstance(x, (int, float)) for x in expert_counts):
+        #             max_value = max(expert_counts)
+        #             max_index = expert_counts.index(max_value)
+        #             print(f"Max value in {expert_counts_attr} is at index: {max_index}")
+
+        #             # 检查 ema_comparison_masks 和 self.stop_masks 的状态
+        #             print(f"ema_comparison_masks[layer_idx]: {ema_comparison_masks[layer_idx]}")
+        #             print(f"self.stop_masks[layer_idx]: {self.stop_masks[layer_idx]}")
+
+        #             if ema_comparison_masks[layer_idx][max_index] == 0 and self.stop_masks[layer_idx][max_index] == 1:
+        #                 print(f"Conditions met for max_index: {max_index}")
+        #                 self.stop_masks[layer_idx][max_index] = 0  # 更新stop_masks，屏蔽该专家
+
+        #             # 手动将 P_gate 中对应 stop_masks 为 0 的位置设置为 0
+        #             for idx, mask_value in enumerate(self.stop_masks[layer_idx]):
+        #                 if mask_value == 0:
+        #                     self.P_gate[idx] = 0
+        #             print("Layer.py P_gate = ", self.P_gate)
+        #         else:
+        #             print(f"expert_counts is empty for {expert_counts_attr}")
+        #     else:
+        #         print(f"Object does not have attribute {expert_counts_attr}")
+            
+        # ------------------------------------------------------------------------------------------------
         #gate_top_k_idx ==> 被選中的expert 是編號幾
         #gate_score ==> 被選中的expert 分數是多少
-        gate_top_k_idx, gate_score = self.gate(moe_inp, P_gate)
+        gate_top_k_idx, gate_score = self.gate(moe_inp, self.P_gate)
         # print(self.gate,gate_top_k_idx, gate_score)
         
         if self.gate_hook is not None:
@@ -342,20 +390,39 @@ class FMoE(nn.Module):
                 # 计算当前专家作为第二选择的次数
                 count_second_choice = torch.nonzero(gate_top_k_idx[rebatch_padding_mask][:, 1] == i, as_tuple=False).size(0)
                 # 将两个计数相加得到总激活次数
-                experts_counts[i] = count_first_choice + count_second_choice
+                experts_counts[i] = int(count_first_choice + count_second_choice)
             # self.experts_counts = [sum(x) for x in zip(self.experts_counts, experts_counts)]
                 
-            if layer_idx not in self.layer_experts_counts:
-                self.layer_experts_counts[layer_idx] = experts_counts
-            else:
-                self.layer_experts_counts[layer_idx] = [
-                    sum(x) for x in zip(self.layer_experts_counts[layer_idx], experts_counts)
-                ]
+
+            layer_experts_counts_attr = f'layer_experts_counts_{layer_idx}'
+            # 检查并初始化属性
+            if not hasattr(self, layer_experts_counts_attr):
+                setattr(self, layer_experts_counts_attr, [0] * self.num_expert)
+
+            # 获取属性值
+            layer_experts_counts = getattr(self, layer_experts_counts_attr)
 
 
-            output_file_counts = f"expert_counts_layer_{layer_idx}.npy"
-            np.save(output_file_counts, np.array(self.layer_experts_counts[layer_idx]))
-        
+            # 确保属性值是整数列表
+            if not isinstance(layer_experts_counts, list):
+                raise ValueError(f"Expected {layer_experts_counts_attr} to be a list.")
+            
+            if not all(isinstance(x, int) for x in layer_experts_counts):
+                raise ValueError(f"Expected all elements in {layer_experts_counts_attr} to be integers.")
+
+            if not all(isinstance(x, int) for x in experts_counts):
+                raise ValueError("Expected all elements in experts_counts to be integers.")
+            
+            # 累加激活次数到属性
+            layer_experts_counts = [
+                x + y for x, y in zip(layer_experts_counts, experts_counts)
+            ]
+
+            # 更新属性值
+            setattr(self, layer_experts_counts_attr, layer_experts_counts)
+
+
+            np.save(f"expert_counts_layer_{layer_idx}.npy", layer_experts_counts)
         
         top_k_value = top_k
         throttling_costs = 0

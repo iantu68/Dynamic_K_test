@@ -32,6 +32,17 @@ from fmoe.distributed import DistributedGroupedDataParallel as DDP
 
 os.environ['TRANSFORMERS_NO_ADVISORY_WARNINGS'] = 'true'
 
+
+def save_checkpoint(model, optimizer, epoch, step, file_path):
+    checkpoint = {
+        'epoch': epoch,
+        'step': step,
+        'model_state_dict': model.state_dict(),
+        'optimizer_state_dict': optimizer.state_dict(),
+    }
+    torch.save(checkpoint, file_path)
+    print(f"Checkpoint saved at epoch {epoch}, step {step} to {file_path}")
+
 # train bert
 def train_Bert_MoE(**kwargs):
     device = kwargs['device']
@@ -210,6 +221,15 @@ def train_Bert_MoE(**kwargs):
         inputs["example_id"] = example_ids
         return inputs
     
+    # EMA200计算函数
+    def calculate_ema200(data, window=200):
+        ema = [sum(data[:window])/window]
+        alpha = 2 / (window + 1)
+        for price in data[window:]:
+            ema.append(ema[-1] + alpha * (price - ema[-1]))
+        return ema[-1]
+
+    
     # ---------------------------------------------------------------------------------------
     datasets = load_dataset("squad")
     # raw_datasets  = raw_datasets.train_test_split(test_size=0.2)
@@ -304,6 +324,8 @@ def train_Bert_MoE(**kwargs):
     expert_grads_FFN6_Avg = [[]for i in range(8)]
     expert_grads_FFN7_Avg = [[]for i in range(8)]
 
+    ema_comparison_masks = [[1] * 8 for _ in range(2)]
+
     count = 0
     step = 0
     loss_all = 0
@@ -316,12 +338,18 @@ def train_Bert_MoE(**kwargs):
     losses = []
     acc = []
     gate_grads_0 = []
-    this_grads1 = None
-    this_grads2 = None
+    avg_grads1 = None
+    avg_grads2 = None
+    previous_grad1 = None
+    previous_grad2 = None
     try:
         for epoch in range(num_epochs):
             model.train()
             start_time = time.time()
+
+            if count % 30 == 0:
+                save_checkpoint(model, optimizer, epoch, count, f"checkpoint_epoch_{epoch}.pth")
+            count += 1
             for batch in train_dataloader:
                 # print(len(train_dataloader))
                 # print(batch['input_ids'])
@@ -347,7 +375,8 @@ def train_Bert_MoE(**kwargs):
                 # print("="*10 + "Training.py" + "="*10)
                 outputs = model(**batch, training_step = step, batch_padding_mask = batch_padding_mask,
                                 last_elements_FFN0 = last_elements_FFN0, last_elements_FFN1 = last_elements_FFN1,
-                                last_elements_FFN2 = last_elements_FFN2, last_elements_FFN3 = last_elements_FFN3,)
+                                last_elements_FFN2 = last_elements_FFN2, last_elements_FFN3 = last_elements_FFN3,
+                                ema_comparison_masks = ema_comparison_masks)
                                 # last_elements_FFN0 = last_elements_FFN0, last_elements_FFN1 = last_elements_FFN1,
                                 # last_elements_FFN0 = last_elements_FFN0, last_elements_FFN1 = last_elements_FFN1,)
                 loss = outputs.loss
@@ -363,39 +392,72 @@ def train_Bert_MoE(**kwargs):
                 #Single Expert gradient output
                 for name, para in model.named_parameters():
                     for i in range(2):
+                        # print("Layer = ", i)
                         for j in range(8):
-                            # this_grads1 = None
-                            # this_grads2 = None
-                            #FFN0_FFN1_nabs
-                            if "bert.encoder.layer." + str(i) +".moe_linear.experts." + str(j) + ".htoh4.weight" in name:
-                                count += 1
-                                this_grads1 = para.grad.detach().norm().view(-1).cpu().numpy()
-                                # print(f"expert_grads_FFN{i}_Linear0_nabs[{j}] = ", this_grads1)
-                                eval(f"expert_grads_FFN{i}_Linear0_nabs[{j}]").extend(this_grads1)
-                            # print(f"grads1 : ", this_grads1)
-                            # print(count)
-                            if "bert.encoder.layer." + str(i) +".moe_linear.experts." + str(j) + ".h4toh.weight" in name:
-                                this_grads2 = para.grad.detach().norm().view(-1).cpu().numpy()
-                                # print(f"expert_grads_FFN{i}_Linear1_nabs[{j}] = ", this_grads2)
-                                eval(f"expert_grads_FFN{i}_Linear1_nabs[{j}]").extend(this_grads2)
-                            # print("grads2 : ", this_grads2)
-                            # print(count)
-                            if this_grads1 is not None and this_grads2 is not None:
-                            # avg_grads = weighted_average(eval(f"expert_grads_FFN{i}_Linear0_nabs[{j}]"), eval(f"expert_grads_FFN{i}_Linear1_nabs[{j}]"))   
-                                # print("grads1 : ", this_grads1)
-                                avg_grads = (this_grads1 + this_grads2) * 0.5
-                                # print(f"FFN{i}_grads_avg_[{j}] = ", avg_lsgrads)
-                                if isinstance(avg_grads, np.ndarray) or isinstance(avg_grads, torch.Tensor):
-                                    avg_grads_value = avg_grads.item()  # 提取标量值
+                            if f"bert.encoder.layer.{i}.moe_linear.experts.{j}.htoh4.weight" in name:
+                                # count += 1
+                                # 获取上一次的梯度值，如果列表为空则设为0
+                                previous_grads1_list = eval(f"expert_grads_FFN{i}_Linear0_nabs[{j}]")
+                                if previous_grads1_list:
+                                    previous_grad1 = previous_grads1_list[-1]
                                 else:
-                                    # print("This is Value")
-                                    avg_grads_value = avg_grads  # 如果已经是标量，直接赋值
-                                eval(f"expert_grads_FFN{i}_Avg[{j}]").append(avg_grads_value)
-                                this_grads1 = None
-                                this_grads2 = None
-                            print(f"expert_grads_FFN{i}_Avg = ", avg_grads_value)
+                                    previous_grad1 = 0.0
 
-                count += 1
+                                # 获取当前梯度值
+                                this_grads1 = para.grad.detach().norm().view(-1).cpu().numpy()
+                                avg_grads1 = (previous_grad1 * len(previous_grads1_list) + this_grads1) / (len(previous_grads1_list) + 1)
+
+                                # 更新梯度列表
+                                eval(f"expert_grads_FFN{i}_Linear0_nabs[{j}]").append(avg_grads1)
+
+                            if f"bert.encoder.layer.{i}.moe_linear.experts.{j}.h4toh.weight" in name:
+                                # 获取上一次的梯度值，如果列表为空则设为0
+                                previous_grads2_list = eval(f"expert_grads_FFN{i}_Linear1_nabs[{j}]")
+                                if previous_grads2_list:
+                                    previous_grad2 = previous_grads2_list[-1]
+                                else:
+                                    previous_grad2 = 0.0
+
+                                # 获取当前梯度值
+                                this_grads2 = para.grad.detach().norm().view(-1).cpu().numpy()
+                                avg_grads2 = (previous_grad2 * len(previous_grads2_list) + this_grads2) / (len(previous_grads2_list) + 1)
+
+                                # 更新梯度列表
+                                eval(f"expert_grads_FFN{i}_Linear1_nabs[{j}]").append(avg_grads2)
+
+                            if avg_grads1 is not None and avg_grads2 is not None:
+                                # 计算两个梯度的平均值
+                                linear_avg_grads = (avg_grads1 + avg_grads2) * 0.5
+
+                                # 确保平均值是标量
+                                if isinstance(linear_avg_grads, np.ndarray) or isinstance(linear_avg_grads, torch.Tensor):
+                                    avg_grads_value = linear_avg_grads.item()  # 提取标量值
+                                else:
+                                    avg_grads_value = linear_avg_grads  # 如果已经是标量，直接赋值
+
+                                # 更新平均梯度列表
+                                eval(f"expert_grads_FFN{i}_Avg[{j}]").append(avg_grads_value)
+                                # print(f"expert_grads_FFN0_Avg[{j}] = ", len(expert_grads_FFN0_Avg[j]))
+                                # 清除临时变量
+                                avg_grads1 = None
+                                avg_grads2 = None
+
+                            # 计算EMA200
+                            if len(eval(f"expert_grads_FFN{i}_Avg[{j}]")) >= 200:
+                                ema200 = calculate_ema200(eval(f"expert_grads_FFN{i}_Avg[{j}]"))
+                                # 比较当前移动平均梯度和EMA200
+                                if avg_grads_value > ema200:
+                                    ema_comparison_masks[i][j] = 1
+                                else:
+                                    ema_comparison_masks[i][j] = 0
+
+                                # print(f"ema_comparison_masks{i} = ", ema_comparison_masks[i])
+
+                            
+                            # 输出当前平均梯度值
+                            # print(f"expert_grads_FFN{i}_Avg[{j}] = ", avg_grads_value)
+                        
+
                 optimizer.zero_grad()
                 # torch.cuda.empty_cache()  # 清理缓存
                 elapsed_all += time.time() - batch_start
@@ -457,16 +519,15 @@ def train_Bert_MoE(**kwargs):
         np.save('acc.npy', acc)
         # np.save('FFN0_grads_Avg.npy', expert_grads_FFN0_Avg)
         # np.save('FFN1_grads_Avg.npy', expert_grads_FFN1_Avg)
-        for i in range(2):
+        for i in range(8):
             np.save(f"FFN0_grads_Avg_{i}.npy", expert_grads_FFN0_Avg[i])
             np.save(f"FFN1_grads_Avg_{i}.npy", expert_grads_FFN1_Avg[i])
             # np.save(f"FFN2_grads_Avg_{i}.npy", expert_grads_FFN2_Avg[i])
             # np.save(f"FFN3_grads_Avg_{i}.npy", expert_grads_FFN3_Avg[i])
-
-            np.save(f"expert_grads_FFN0_Linear0_{i}_nabs.npy", expert_grads_FFN0_Linear0_nabs[i])
-            np.save(f"expert_grads_FFN0_Linear1_{i}_nabs.npy", expert_grads_FFN0_Linear1_nabs[i])
-            np.save(f"expert_grads_FFN1_Linear0_{i}_nabs.npy", expert_grads_FFN1_Linear0_nabs[i])
-            np.save(f"expert_grads_FFN1_Linear1_{i}_nabs.npy", expert_grads_FFN1_Linear1_nabs[i])
+            # np.save(f"expert_grads_FFN0_Linear0_{i}_nabs.npy", expert_grads_FFN0_Linear0_nabs[i])
+            # np.save(f"expert_grads_FFN0_Linear1_{i}_nabs.npy", expert_grads_FFN0_Linear1_nabs[i])
+            # np.save(f"expert_grads_FFN1_Linear0_{i}_nabs.npy", expert_grads_FFN1_Linear0_nabs[i])
+            # np.save(f"expert_grads_FFN1_Linear1_{i}_nabs.npy", expert_grads_FFN1_Linear1_nabs[i])
             # np.save(f"expert_grads_FFN2_Linear0_{i}_nabs.npy", expert_grads_FFN2_Linear0_nabs[i])
             # np.save(f"expert_grads_FFN2_Linear1_{i}_nabs.npy", expert_grads_FFN2_Linear1_nabs[i])
             # np.save(f"expert_grads_FFN3_Linear0_{i}_nabs.npy", expert_grads_FFN3_Linear0_nabs[i])
@@ -482,4 +543,4 @@ def train_Bert_MoE(**kwargs):
     #     wandb.finish()
     del model
     del datasets
-    del tokenizer#
+    del tokenizer
