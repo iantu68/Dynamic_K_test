@@ -314,6 +314,11 @@ def train_Bert_MoE(**kwargs):
     expert_grads_FFN4_Linear1_nabs = [[]for i in range(8)]
     expert_grads_FFN5_Linear0_nabs = [[]for i in range(8)]
     expert_grads_FFN5_Linear1_nabs = [[]for i in range(8)]
+    expert_grads_FFN6_Linear0_nabs = [[]for i in range(8)]
+    expert_grads_FFN6_Linear1_nabs = [[]for i in range(8)]
+    expert_grads_FFN7_Linear0_nabs = [[]for i in range(8)]
+    expert_grads_FFN7_Linear1_nabs = [[]for i in range(8)]
+
 
     expert_grads_FFN0_Avg = [[]for i in range(8)]
     expert_grads_FFN1_Avg = [[]for i in range(8)]
@@ -376,7 +381,9 @@ def train_Bert_MoE(**kwargs):
                 outputs = model(**batch, training_step = step, batch_padding_mask = batch_padding_mask,
                                 last_elements_FFN0 = last_elements_FFN0, last_elements_FFN1 = last_elements_FFN1,
                                 last_elements_FFN2 = last_elements_FFN2, last_elements_FFN3 = last_elements_FFN3,
-                                ema_comparison_masks = ema_comparison_masks)
+                                last_elements_FFN4 = last_elements_FFN4, last_elements_FFN5 = last_elements_FFN5,
+                                last_elements_FFN6 = last_elements_FFN6, last_elements_FFN7 = last_elements_FFN7,)
+                                # ema_comparison_masks = ema_comparison_masks)
                                 # last_elements_FFN0 = last_elements_FFN0, last_elements_FFN1 = last_elements_FFN1,
                                 # last_elements_FFN0 = last_elements_FFN0, last_elements_FFN1 = last_elements_FFN1,)
                 loss = outputs.loss
@@ -391,7 +398,7 @@ def train_Bert_MoE(**kwargs):
                 print ("===============catch===============")
                 #Single Expert gradient output
                 for name, para in model.named_parameters():
-                    for i in range(2):
+                    for i in range(8):
                         # print("Layer = ", i)
                         for j in range(8):
                             if f"bert.encoder.layer.{i}.moe_linear.experts.{j}.htoh4.weight" in name:
@@ -442,14 +449,14 @@ def train_Bert_MoE(**kwargs):
                                 avg_grads1 = None
                                 avg_grads2 = None
 
-                            # 计算EMA200
-                            if len(eval(f"expert_grads_FFN{i}_Avg[{j}]")) >= 200:
-                                ema200 = calculate_ema200(eval(f"expert_grads_FFN{i}_Avg[{j}]"))
-                                # 比较当前移动平均梯度和EMA200
-                                if avg_grads_value > ema200:
-                                    ema_comparison_masks[i][j] = 1
-                                else:
-                                    ema_comparison_masks[i][j] = 0
+                            # # 计算EMA200
+                            # if len(eval(f"expert_grads_FFN{i}_Avg[{j}]")) >= 200:
+                            #     ema200 = calculate_ema200(eval(f"expert_grads_FFN{i}_Avg[{j}]"))
+                            #     # 比较当前移动平均梯度和EMA200
+                            #     if avg_grads_value > ema200:
+                            #         ema_comparison_masks[i][j] = 1
+                            #     else:
+                            #         ema_comparison_masks[i][j] = 0
 
                                 # print(f"ema_comparison_masks{i} = ", ema_comparison_masks[i])
 
@@ -522,8 +529,12 @@ def train_Bert_MoE(**kwargs):
         for i in range(8):
             np.save(f"FFN0_grads_Avg_{i}.npy", expert_grads_FFN0_Avg[i])
             np.save(f"FFN1_grads_Avg_{i}.npy", expert_grads_FFN1_Avg[i])
-            # np.save(f"FFN2_grads_Avg_{i}.npy", expert_grads_FFN2_Avg[i])
-            # np.save(f"FFN3_grads_Avg_{i}.npy", expert_grads_FFN3_Avg[i])
+            np.save(f"FFN2_grads_Avg_{i}.npy", expert_grads_FFN2_Avg[i])
+            np.save(f"FFN3_grads_Avg_{i}.npy", expert_grads_FFN3_Avg[i])
+            np.save(f"FFN4_grads_Avg_{i}.npy", expert_grads_FFN4_Avg[i])
+            np.save(f"FFN5_grads_Avg_{i}.npy", expert_grads_FFN5_Avg[i])
+            np.save(f"FFN6_grads_Avg_{i}.npy", expert_grads_FFN6_Avg[i])
+            np.save(f"FFN7_grads_Avg_{i}.npy", expert_grads_FFN7_Avg[i])
             # np.save(f"expert_grads_FFN0_Linear0_{i}_nabs.npy", expert_grads_FFN0_Linear0_nabs[i])
             # np.save(f"expert_grads_FFN0_Linear1_{i}_nabs.npy", expert_grads_FFN0_Linear1_nabs[i])
             # np.save(f"expert_grads_FFN1_Linear0_{i}_nabs.npy", expert_grads_FFN1_Linear0_nabs[i])

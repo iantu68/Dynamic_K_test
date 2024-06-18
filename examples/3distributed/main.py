@@ -68,9 +68,9 @@ args = parser.parse_args()
 assert args.moe_num_experts >= args.moe_top_k, "must have moe-num-expert >= moe-top_k"
 
 # # set environment
-# device = torch.device('cuda' if args.cuda else 'cpu')
+device = torch.device('cuda' if args.cuda else 'cpu')
 # device = torch.device('cuda:0')
-device = torch.device('cuda:1')
+# device = torch.device('cuda:1')
 if args.expert_parallel:
     global_rank = int(os.environ["RANK"])
     local_rank = int(os.environ["LOCAL_RANK"])

@@ -2,8 +2,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # 載入檔案
-# training_loss = np.load('losses.npy')
-# acc = np.load('acc.npy')
+training_loss = np.load('losses.npy')
+# eval_loss = np.load('eval.npy')
+acc = np.load('acc.npy')
 frequency_0 = np.load('expert_counts_layer_0.npy')
 frequency_1 = np.load('expert_counts_layer_1.npy')
 
@@ -62,36 +63,39 @@ plt.savefig('Expert_count_Layer1.png')
 plt.show()
 
 # --------------------------------------------------------------------------------------------
-# # Plot Loss
-# training_loss = calculate_avg_steps(training_loss)
+# Plot Loss
+training_loss = calculate_avg_steps(training_loss)
+# eval_loss= calculate_avg_steps(eval_loss)
 
-# plt.figure()
-# plt.plot(training_loss, label='Train_loss', color='blue')
-# plt.legend(loc='upper right')
-# plt.title(f'Loss_Values_Curve')
-# plt.xlabel('Training Step')
-# plt.ylabel('Loss Value')
-# plt.savefig(f'Loss_Values_Curve.png')
-# plt.show()
 
-# # --------------------------------------------------------------------------------------------
-# # Plot Acc
-# acc = calculate_avg_steps(acc)
+plt.figure()
+plt.plot(training_loss, label='Train_loss', color='blue')
+# plt.plot(eval_loss, label='Valid_loss', color='red')
+plt.legend(loc='upper right')
+plt.title(f'Loss_Values_Curve')
+plt.xlabel('Training Step')
+plt.ylabel('Loss Value')
+plt.savefig(f'Loss_Values_Curve.png')
+plt.show()
 
-# plt.figure()
-# plt.plot(acc, label='Accuracy', color='red', linestyle='-')
-# max_acc = max(acc)
-# max_acc_epoch = np.argmax(acc)
-# plt.axvline(x=max_acc_epoch, color='red', linewidth=0.8)
-# plt.annotate(f'Max Accuracy: {max_acc:.4f} at Epoch {max_acc_epoch}', 
-#              xy=(max_acc_epoch, max_acc), 
-#              xytext=(max_acc_epoch, max_acc + 0.1))
-# plt.legend()
-# plt.title(f'Accuracy_Curve')
-# plt.xlabel('Epoch')
-# plt.ylabel('Accuracy (%)')
-# plt.savefig(f'Accuracy_Curve.png')
-# plt.show()
+# --------------------------------------------------------------------------------------------
+# Plot Acc
+acc = calculate_avg_steps(acc)
+
+plt.figure()
+plt.plot(acc, label='Accuracy', color='red', linestyle='-')
+max_acc = max(acc)
+max_acc_epoch = np.argmax(acc)
+plt.axvline(x=max_acc_epoch, color='red', linewidth=0.8)
+plt.annotate(f'Max Accuracy: {max_acc:.4f} at Epoch {max_acc_epoch}', 
+             xy=(max_acc_epoch, max_acc), 
+             xytext=(max_acc_epoch, max_acc + 0.1))
+plt.legend()
+plt.title(f'Accuracy_Curve')
+plt.xlabel('Epoch')
+plt.ylabel('Accuracy (%)')
+plt.savefig(f'Accuracy_Curve.png')
+plt.show()
 
 # --------------------------------------------------------------------------------------------
 # Plot Expert Grads

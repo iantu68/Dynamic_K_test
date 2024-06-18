@@ -1,7 +1,7 @@
 #!/bin/bash
 
-total_epochs=1
-dir="New_Tiny_My_idea_20epoch"
+total_epochs=5
+dir="New_Medium_Base_10epoch_batch16"
 
 # 循环运行 run.sh 脚本
 for ((i=1; i<=$total_epochs; i++))

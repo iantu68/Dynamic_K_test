@@ -1,2 +1,2 @@
 #!/bin/bash
-rm -rf *.txt *.png *.npy
+rm -rf *.txt *.png *.npy *.pth
