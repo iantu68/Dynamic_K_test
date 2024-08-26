@@ -1695,6 +1695,17 @@ class BertForSequenceClassification(BertPreTrainedModel):
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
+        training_step: Optional[int] = None,
+        batch_padding_mask: Optional[torch.Tensor] = None,
+        last_elements_FFN0: Optional[torch.Tensor] = None, 
+        last_elements_FFN1: Optional[torch.Tensor] = None, 
+        last_elements_FFN2: Optional[torch.Tensor] = None, 
+        last_elements_FFN3: Optional[torch.Tensor] = None, 
+        last_elements_FFN4: Optional[torch.Tensor] = None, 
+        last_elements_FFN5: Optional[torch.Tensor] = None, 
+        last_elements_FFN6: Optional[torch.Tensor] = None, 
+        last_elements_FFN7: Optional[torch.Tensor] = None, 
+        ema_comparison_masks: Optional[torch.Tensor] = None
     ) -> Union[Tuple[torch.Tensor], SequenceClassifierOutput]:
         r"""
         labels (`torch.LongTensor` of shape `(batch_size,)`, *optional*):
@@ -1714,6 +1725,17 @@ class BertForSequenceClassification(BertPreTrainedModel):
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
+            training_step=training_step,
+            batch_padding_mask=batch_padding_mask,
+            last_elements_FFN0=last_elements_FFN0,
+            last_elements_FFN1=last_elements_FFN1,
+            last_elements_FFN2=last_elements_FFN2,
+            last_elements_FFN3=last_elements_FFN3,
+            last_elements_FFN4=last_elements_FFN4,
+            last_elements_FFN5=last_elements_FFN5,
+            last_elements_FFN6=last_elements_FFN6,
+            last_elements_FFN7=last_elements_FFN7,
+            ema_comparison_masks=ema_comparison_masks
         )
 
         pooled_output = outputs[1]

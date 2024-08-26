@@ -1,0 +1,31 @@
+
+  warnings.warn('Was asked to gather along dimension 0, but all '                                                                      | 0/2738 [00:00<?, ?it/s]
+Traceback (most recent call last):
+  File "/home/hagoo_file/Dynamic_K_test/examples/Bert/bert.py", line 123, in <module>
+    trainer.train()
+  File "/home/anaconda3/envs/2fmoe/lib/python3.10/site-packages/transformers/trainer.py", line 1885, in train
+    return inner_training_loop(
+  File "/home/anaconda3/envs/2fmoe/lib/python3.10/site-packages/transformers/trainer.py", line 2216, in _inner_training_loop
+    tr_loss_step = self.training_step(model, inputs)
+  File "/home/anaconda3/envs/2fmoe/lib/python3.10/site-packages/transformers/trainer.py", line 3238, in training_step
+    loss = self.compute_loss(model, inputs)
+  File "/home/anaconda3/envs/2fmoe/lib/python3.10/site-packages/transformers/trainer.py", line 3264, in compute_loss
+    outputs = model(**inputs)
+  File "/home/anaconda3/envs/2fmoe/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1501, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/anaconda3/envs/2fmoe/lib/python3.10/site-packages/torch/nn/parallel/data_parallel.py", line 172, in forward
+    return self.gather(outputs, self.output_device)
+  File "/home/anaconda3/envs/2fmoe/lib/python3.10/site-packages/torch/nn/parallel/data_parallel.py", line 184, in gather
+    return gather(outputs, output_device, dim=self.dim)
+  File "/home/anaconda3/envs/2fmoe/lib/python3.10/site-packages/torch/nn/parallel/scatter_gather.py", line 86, in gather
+    res = gather_map(outputs)
+  File "/home/anaconda3/envs/2fmoe/lib/python3.10/site-packages/torch/nn/parallel/scatter_gather.py", line 77, in gather_map
+    return type(out)((k, gather_map([d[k] for d in outputs]))
+  File "<string>", line 10, in __init__
+  File "/home/anaconda3/envs/2fmoe/lib/python3.10/site-packages/transformers/utils/generic.py", line 389, in __post_init__
+    for idx, element in enumerate(iterator):
+  File "/home/anaconda3/envs/2fmoe/lib/python3.10/site-packages/torch/nn/parallel/scatter_gather.py", line 77, in <genexpr>
+    return type(out)((k, gather_map([d[k] for d in outputs]))
+  File "/home/anaconda3/envs/2fmoe/lib/python3.10/site-packages/torch/nn/parallel/scatter_gather.py", line 81, in gather_map
+    return type(out)(map(gather_map, zip(*outputs)))
+TypeError: 'int' object is not iterable

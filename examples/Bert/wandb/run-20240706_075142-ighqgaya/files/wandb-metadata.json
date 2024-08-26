@@ -1,0 +1,132 @@
+{
+    "os": "Linux-5.4.0-150-generic-x86_64-with-glibc2.27",
+    "python": "3.10.14",
+    "heartbeatAt": "2024-07-06T07:51:43.288323",
+    "startedAt": "2024-07-06T07:51:42.764145",
+    "docker": null,
+    "cuda": null,
+    "args": [],
+    "state": "running",
+    "program": "/home/hagoo_file/Dynamic_K_test/examples/Bert/bert.py",
+    "codePathLocal": "bert.py",
+    "codePath": "examples/Bert/bert.py",
+    "git": {
+        "remote": "https://github.com/s10727128/Dynamic_K_test.git",
+        "commit": "0658b0ba2c3bac36dde234755afea862c9990edf"
+    },
+    "email": "your_email@example.com",
+    "root": "/home/hagoo_file/Dynamic_K_test",
+    "host": "LAB_SERVER",
+    "username": "root",
+    "executable": "/home/anaconda3/envs/2fmoe/bin/python",
+    "cpu_count": 8,
+    "cpu_count_logical": 16,
+    "cpu_freq": {
+        "current": 4627.224187500001,
+        "min": 800.0,
+        "max": 4800.0
+    },
+    "cpu_freq_per_core": [
+        {
+            "current": 4601.623,
+            "min": 800.0,
+            "max": 4800.0
+        },
+        {
+            "current": 4618.042,
+            "min": 800.0,
+            "max": 4800.0
+        },
+        {
+            "current": 4637.469,
+            "min": 800.0,
+            "max": 4800.0
+        },
+        {
+            "current": 4643.269,
+            "min": 800.0,
+            "max": 4800.0
+        },
+        {
+            "current": 4643.396,
+            "min": 800.0,
+            "max": 4800.0
+        },
+        {
+            "current": 4601.327,
+            "min": 800.0,
+            "max": 4800.0
+        },
+        {
+            "current": 4617.453,
+            "min": 800.0,
+            "max": 4800.0
+        },
+        {
+            "current": 4651.398,
+            "min": 800.0,
+            "max": 4800.0
+        },
+        {
+            "current": 4609.667,
+            "min": 800.0,
+            "max": 4800.0
+        },
+        {
+            "current": 4607.908,
+            "min": 800.0,
+            "max": 4800.0
+        },
+        {
+            "current": 4605.448,
+            "min": 800.0,
+            "max": 4800.0
+        },
+        {
+            "current": 4648.541,
+            "min": 800.0,
+            "max": 4800.0
+        },
+        {
+            "current": 4629.206,
+            "min": 800.0,
+            "max": 4800.0
+        },
+        {
+            "current": 4644.135,
+            "min": 800.0,
+            "max": 4800.0
+        },
+        {
+            "current": 4674.891,
+            "min": 800.0,
+            "max": 4800.0
+        },
+        {
+            "current": 4601.814,
+            "min": 800.0,
+            "max": 4800.0
+        }
+    ],
+    "disk": {
+        "/": {
+            "total": 915.3232879638672,
+            "used": 781.1201629638672
+        }
+    },
+    "gpu": "NVIDIA GeForce RTX 3080",
+    "gpu_count": 2,
+    "gpu_devices": [
+        {
+            "name": "NVIDIA GeForce RTX 3080",
+            "memory_total": 10737418240
+        },
+        {
+            "name": "NVIDIA GeForce RTX 2080 SUPER",
+            "memory_total": 8589934592
+        }
+    ],
+    "memory": {
+        "total": 31.251190185546875
+    }
+}
